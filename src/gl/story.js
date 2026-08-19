@@ -13,7 +13,7 @@
 import {
   Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry, BufferGeometry,
   InstancedBufferGeometry, InstancedBufferAttribute, IcosahedronGeometry,
-  BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, Vector4, CanvasTexture, SRGBColorSpace,
+  BufferAttribute, ShaderMaterial, MeshBasicMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, Vector4, CanvasTexture, SRGBColorSpace,
 } from "three";
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -468,30 +468,6 @@ function makeSheetTexture() {
   return t;
 }
 
-const SHEET_VERT = /* glsl */ `
-  varying vec2 vUv;
-  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-`;
-
-const SHEET_FRAG = /* glsl */ `
-  uniform sampler2D uTex;
-  uniform float uAlpha, uWipeIn;
-  uniform vec3 uCyan;
-  varying vec2 vUv;
-  void main() {
-    if (vOn < 0.01) discard;
-    // The sheet writes itself left to right as the data lands in it.
-    float front = uWipeIn;
-    float on = smoothstep(front + 0.05, front - 0.02, vUv.x);
-    if (on < 0.01) discard;
-    vec3 col = texture2D(uTex, vUv).rgb;
-    col += uCyan * smoothstep(0.045, 0.0, abs(vUv.x - front)) * 0.5;
-    float edge = smoothstep(0.0, 0.012, vUv.x) * smoothstep(1.0, 0.988, vUv.x)
-               * smoothstep(0.0, 0.018, vUv.y) * smoothstep(1.0, 0.982, vUv.y);
-    gl_FragColor = vec4(col, uAlpha * on * edge);
-  }
-`;
-
 /* ---------- capture frame ---------- */
 
 /* The viewfinder that finds the receipt's edges, locks on, and takes it.
@@ -739,13 +715,14 @@ export function createStory(canvas) {
   folders.frustumCulled = false;
   scene.add(folders);
 
-  const sheetMat = new ShaderMaterial({
-    name: "sheet",
-    vertexShader: SHEET_VERT, fragmentShader: SHEET_FRAG, transparent: true, depthWrite: false,
-    uniforms: { uTex: { value: makeSheetTexture() }, uAlpha: { value: 0 },
-                uWipeIn: { value: 0 }, uCyan: { value: CYAN } },
+  // A standard material on purpose: the custom sheet shader intermittently
+  // failed to link, and when it did the spreadsheet never drew at all.
+  const sheetTex = makeSheetTexture();
+  const sheetMat = new MeshBasicMaterial({
+    name: "sheet", map: sheetTex, transparent: true, depthWrite: false, opacity: 0,
   });
-  const sheet = new Mesh(new PlaneGeometry(3.5, 2.4), sheetMat);
+  const SHEET_W = 3.5, SHEET_H = 2.4;
+  const sheet = new Mesh(new PlaneGeometry(1, 1), sheetMat);   // scale carries size
   sheet.visible = false;
   scene.add(sheet);
 
@@ -883,15 +860,21 @@ export function createStory(canvas) {
 
     // 10 the rows condense toward the ring rather than simply fading.
     const toDash = ease(range(p, 0.614, 0.656));
-    sheet.position.x += toDash * (0 - sheet.position.x) * 0.9;
-    sheet.position.y += toDash * (1.15 - sheet.position.y) * 0.9;
-
     sheet.visible = settle > 0.001 && p < 0.66;
-    sheetMat.uniforms.uAlpha.value = range(p, 0.544, 0.576) * (1 - range(p, 0.610, 0.652));
-    sheetMat.uniforms.uWipeIn.value = ease(range(p, 0.552, 0.600));
-    sheet.position.set(-1.95 * settle, 0.30 * settle, -0.05);
+    sheetMat.opacity = range(p, 0.544, 0.576) * (1 - range(p, 0.610, 0.652));
+
+    // Reveal by showing only the left fraction of the texture at 1:1, so the
+    // sheet writes itself in rather than stretching.
+    const wipe = Math.max(0.001, ease(range(p, 0.552, 0.600)));
+    sheetTex.repeat.x = wipe;
     const ss = 0.30 + 0.70 * settle;
-    sheet.scale.set(ss, ss, 1);
+    const fullW = SHEET_W * ss, w = fullW * wipe;
+    sheet.scale.set(w, SHEET_H * ss, 1);
+    // Position first, then condense toward the dashboard. The old order set
+    // the position after the condense and threw the condense away.
+    sheet.position.set(-1.95 * settle - (fullW - w) / 2, 0.30 * settle, -0.05);
+    sheet.position.x += toDash * (0 - sheet.position.x);
+    sheet.position.y += toDash * (1.15 - sheet.position.y);
 
     // The paper itself becomes the supporting document.
     paper.position.x = 1.75 * settle;
@@ -909,7 +892,7 @@ export function createStory(canvas) {
       crowd.geometry.dispose(); crowdMat.dispose();
       capture.geometry.dispose(); capMat.dispose();
       folders.geometry.dispose(); folderMat.dispose();
-      sheet.geometry.dispose(); sheetMat.uniforms.uTex.value.dispose(); sheetMat.dispose();
+      sheet.geometry.dispose(); sheetTex.dispose(); sheetMat.dispose();
       renderer.dispose();
     },
   };
