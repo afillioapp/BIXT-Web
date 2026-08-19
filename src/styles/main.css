@@ -187,8 +187,7 @@ body {
   background: color-mix(in oklab, var(--paper) 74%, transparent);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid transparent; transition: border-color 300ms var(--ease); }
-.nav.is-stuck { border-bottom-color: var(--rule); }
+  border-bottom: 0; }
 .nav__in { max-width: 1080px; margin-inline: auto; padding: 0 var(--gutter);
   height: 64px; display: flex; align-items: center; gap: 32px; }
 .wordmark { font-weight: 700; font-size: 1.25rem; letter-spacing: -0.03em;
@@ -282,7 +281,7 @@ body {
 
 /* ---------- scroll progress ---------- */
 
-.progress { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; z-index: 60;
+.progress { position: fixed; left: 0; right: 0; top: 64px; height: 3px; z-index: 60;
   background: color-mix(in oklab, var(--ink) 9%, transparent); pointer-events: none; }
 .progress__bar { display: block; height: 100%; width: 100%; transform: scaleX(0);
   transform-origin: left center; background: var(--cyan);
