@@ -11,16 +11,16 @@
    does the interpolation. */
 
 import {
-  Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry, BufferGeometry,
+  Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry,
   InstancedBufferGeometry, InstancedBufferAttribute, IcosahedronGeometry,
-  BufferAttribute, ShaderMaterial, MeshBasicMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, Vector4, CanvasTexture, SRGBColorSpace,
+  ShaderMaterial, MeshBasicMaterial, Mesh, Color, AdditiveBlending, Vector2, Vector4, CanvasTexture, SRGBColorSpace,
 } from "three";
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 const INK = new Color("#111a2d");
 const CYAN = new Color("#009b95");
-const W = 1.55, H = 4.15, COUNT = 2800;
+const W = 1.55, H = 4.15;
 
 /* ---------- paper ---------- */
 
@@ -253,37 +253,6 @@ function buildCrowd() {
   return g;
 }
 
-/* ---------- points ---------- */
-
-const DUST_VERT = /* glsl */ `
-  attribute vec3 aStart, aEnd;
-  attribute float aSeed;
-  uniform float uT, uSize, uAlpha, uArc;
-  varying float vAlpha;
-  void main() {
-    float e = clamp((uT - aSeed * 0.16) / 0.84, 0.0, 1.0);
-    e = e * e * (3.0 - 2.0 * e);
-    vec3 p = mix(aStart, aEnd, e);
-    float arc = sin(e * 3.14159) * uArc;
-    p.z += arc * (0.4 + aSeed * 0.8);
-    p.x += arc * (aSeed - 0.5) * 0.5;
-    vAlpha = uAlpha;
-    vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_PointSize = uSize * (1.0 / -mv.z);
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const DUST_FRAG = /* glsl */ `
-  uniform vec3 uCyan;
-  varying float vAlpha;
-  void main() {
-    float d = length(gl_PointCoord - 0.5);
-    if (d > 0.5) discard;
-    gl_FragColor = vec4(uCyan, vAlpha * smoothstep(0.5, 0.0, d));
-  }
-`;
-
 /* ---------- folders, drawn as solid lines ---------- */
 
 /* Stroked geometry, not a cloud of points: at this size particles read as
@@ -313,7 +282,7 @@ const FOLDER_VERT = /* glsl */ `
 
 const FOLDER_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform float uDraw, uThick;
+  uniform float uDraw, uGrow, uThick;
   varying vec2 vP;
   varying vec2 vHalf;
   varying float vKind;
@@ -334,7 +303,7 @@ const FOLDER_FRAG = /* glsl */ `
 
     // The link between the two surfaces is a solid rule, not a folder.
     if (vKind > 2.5) {
-      float gh = h.y * (0.08 + 0.92 * clamp(uDraw * 1.3, 0.0, 1.0));
+      float gh = h.y * (0.08 + 0.92 * clamp(uGrow * 1.3, 0.0, 1.0));
       float d3 = rrect(vP - vec2(0.0, gh - h.y), vec2(h.x, gh), min(h.x, 0.07));
       float core3 = smoothstep(0.012, 0.0, d3);
       float glow3 = smoothstep(0.11, 0.0, d3);
@@ -345,7 +314,10 @@ const FOLDER_FRAG = /* glsl */ `
     }
 
     if (vKind > 1.5) {
-      float solid = smoothstep(0.012, 0.0, rrect(vP, h, h.y)) * step(0.30, uDraw);
+      // Runs itself outward on its own opacity, so it does not need a shared
+      // growth value that is already spent by the time this beat arrives.
+      float ext = clamp(vOn * 1.25, 0.0, 1.0);
+      float solid = smoothstep(0.012, 0.0, rrect(vP, vec2(h.x * ext, h.y), h.y));
       if (solid < 0.01) discard;
       gl_FragColor = vec4(uCyan * 1.6, solid * vOn);
       return;
@@ -368,9 +340,10 @@ const FOLDER_FRAG = /* glsl */ `
       d = min(d, seg(vP, vec2(-h.x * 0.62, y), vec2(-h.x * (0.16 - float(i) * 0.12), y)));
     }
 
-    // Draws itself left to right.
-    // Rises from the bottom, the same rule as the bars.
-    float reveal = step((vP.y + h.y) / (2.0 * h.y), uDraw + 0.02);
+    // Rises from the bottom, the same rule as the bars. The tab sits above the
+    // body, so its top normalises to about 1.10 and a plain uDraw threshold
+    // sliced it flat; the headroom takes the sweep past the whole silhouette.
+    float reveal = step((vP.y + h.y) / (2.0 * h.y), uDraw * 1.22 + 0.02);
 
     // Neon: a bright core inside a soft halo.
     float core = smoothstep(uThick, 0.0, d);
@@ -389,21 +362,22 @@ function buildFolders() {
   g.attributes.uv = base.attributes.uv;
 
   //            x      y     w     h    kind  phase
+  const BASE = -0.62;                      // one shared baseline for the chart
+  const bar = (x, hgt) => [x, BASE + hgt / 2, 0.24, hgt, 3, 1];
   const inst = [
-    [-1.95,  0.30,  2.70, 1.95,  0,  0],   // 06  the sheet becomes this
-    [ 1.75, -0.26,  1.70, 2.20,  1,  0],   // 06  the receipt becomes this
-    [-2.15,  0.15,  2.30, 1.70,  0,  1],   // 08  yours
-    [ 2.15,  0.15,  2.30, 1.70,  0,  1],   // 08  your accountant's, same folder
-    [ 0.00,  0.15,  1.70, 0.075, 2,  1],   // 08  the link between them
-    [ 0.00,  0.15,  2.60, 1.90,  1,  2],   // 09  stored
-    // 07  the dashboard, in the same neon line language
-    [-2.55, -0.90,  0.30, 0.62,  3,  3],
-    [-1.70, -0.90,  0.30, 1.18,  3,  3],
-    [-0.85, -0.90,  0.30, 0.86,  3,  3],
-    [+0.00, -0.90,  0.30, 1.72,  3,  3],
-    [+0.85, -0.90,  0.30, 1.30,  3,  3],
-    [+1.70, -0.90,  0.30, 2.05,  3,  3],
-    [+2.55, -0.90,  0.30, 1.52,  3,  3],
+    // The pair. Identical, mirrored, and lit from here to the end: everything
+    // that follows happens to these two rather than replacing them.
+    [-2.42,  0.10,  2.30, 1.86,  0,  0],   // Expenses, where the sheet goes
+    [ 2.42,  0.10,  2.30, 1.86,  0,  0],   // Supporting Documents, where the photo goes
+
+    // What is inside them, surfacing in the gap between. A bar grows from its
+    // own bottom edge, so the centre has to be offset by half the height or
+    // they each sit on a different line.
+    bar(-0.84, 0.46), bar(-0.42, 1.02), bar(0.00, 0.68), bar(0.42, 1.34), bar(0.84, 0.88),
+
+    // The hand-off: one rule under both, because the accountant is given the
+    // same two folders rather than a copy of them.
+    [ 0.00, -1.16,  7.10, 0.055, 2,  2],
   ];
   g.instanceCount = inst.length;
   const pos = new Float32Array(inst.length * 3), size = new Float32Array(inst.length * 2);
@@ -519,142 +493,6 @@ const CAP_FRAG = /* glsl */ `
   }
 `;
 
-/* ---------- formations ---------- */
-
-function buildFormations() {
-  const f = (fn) => { const a = new Float32Array(COUNT * 3); fn(a); return a; };
-
-  // The ink of one receipt — header, items, prices, total.
-  const ink = f((a) => {
-    const rows = [0.940, 0.893, 0.862, 0.762, 0.7145, 0.667, 0.6195, 0.572, 0.5245, 0.477,
-                  0.352, 0.310, 0.246];
-    for (let i = 0; i < COUNT; i++) {
-      const y = rows[i % rows.length];
-      // Two thirds sit in the description column, a third in the price column.
-      const x = (i % 3 === 0) ? rnd(0.80, 0.97) : rnd(0.13, 0.52);
-      a[i * 3] = (x - 0.5) * W;
-      a[i * 3 + 1] = (y - 0.5) * H;
-      a[i * 3 + 2] = 0.02;
-    }
-  });
-
-  // A spreadsheet: 12 rows, 4 column blocks.
-  const rows = f((a) => {
-    const R = 12, C = 4, gw = W * 1.34, gh = H * 0.72, cw = gw / C;
-    for (let i = 0; i < COUNT; i++) {
-      const r = i % R, c = (i / R | 0) % C;
-      a[i * 3] = -gw / 2 + c * cw + cw * rnd(0.10, 0.72);
-      a[i * 3 + 1] = gh / 2 - (r / (R - 1)) * gh + rnd(-0.015, 0.015);
-      a[i * 3 + 2] = 0;
-    }
-  });
-
-  // Twelve months, as twelve tidy blocks — the infographic beat.
-  const months = f((a) => {
-    const cols = 4, rowsN = 3, sx = 1.55, sy = 1.25;
-    for (let i = 0; i < COUNT; i++) {
-      const m = i % 12, cx = (m % cols - (cols - 1) / 2) * sx, cy = ((rowsN - 1) / 2 - (m / cols | 0)) * sy;
-      a[i * 3] = cx + rnd(-0.30, 0.30);
-      a[i * 3 + 1] = cy + rnd(-0.24, 0.24);
-      a[i * 3 + 2] = rnd(-0.05, 0.05);
-    }
-  });
-
-  // You and your accountant, looking at the same folder.
-  const share = f((a) => {
-    for (let i = 0; i < COUNT; i++) {
-      const t = i / COUNT;
-      if (t < 0.38) {            // left column — you
-        a[i * 3] = -2.05 + rnd(-0.42, 0.42); a[i * 3 + 1] = rnd(-1.5, 1.5);
-      } else if (t < 0.76) {     // right column — your accountant
-        a[i * 3] = 2.05 + rnd(-0.42, 0.42); a[i * 3 + 1] = rnd(-1.5, 1.5);
-      } else {                   // the link between them
-        a[i * 3] = rnd(-1.5, 1.5); a[i * 3 + 1] = rnd(-0.05, 0.05);
-      }
-      a[i * 3 + 2] = rnd(-0.08, 0.08);
-    }
-  });
-
-  // What Drive actually holds: the Expenses sheet, and Supporting Documents.
-  const twoFolders = f((a) => {
-    const fw = 1.55, fh = 1.15, gap = 0.42;
-    for (let i = 0; i < COUNT; i++) {
-      const right = i % 2 === 1;
-      const cx = right ? (fw / 2 + gap / 2) : -(fw / 2 + gap / 2);
-      const t = Math.random();
-      let x, y;
-      if (t < 0.62) {                                  // edge
-        const u = Math.random() * (2 * fw + 2 * fh);
-        if (u < fw)               { x = -fw / 2 + u;            y = -fh / 2; }
-        else if (u < fw + fh)     { x = fw / 2;                 y = -fh / 2 + (u - fw); }
-        else if (u < 2 * fw + fh) { x = fw / 2 - (u - fw - fh); y = fh / 2; }
-        else                      { x = -fw / 2;                y = fh / 2 - (u - 2 * fw - fh); }
-      } else if (t < 0.74) {                           // tab
-        x = -fw / 2 + rnd(0, 0.62); y = fh / 2 + rnd(0, 0.20);
-      } else if (right) {                              // photos stacked inside
-        x = rnd(-0.42, 0.42); y = rnd(-0.34, 0.30);
-      } else {                                         // sheet rows inside
-        const row = i % 5;
-        x = rnd(-0.52, 0.52); y = 0.30 - row * 0.15;
-      }
-      a[i * 3] = cx + x + rnd(-0.015, 0.015);
-      a[i * 3 + 1] = y + rnd(-0.015, 0.015);
-      a[i * 3 + 2] = rnd(-0.04, 0.04);
-    }
-  });
-
-  // The dashboard in the app: a run of monthly bars under a header rule.
-  const dashboard = f((a) => {
-    const BARS = 7, bw = 0.42, gap = 0.20, span = BARS * bw + (BARS - 1) * gap;
-    const hts = [0.55, 0.95, 0.72, 1.35, 1.05, 1.6, 1.25];
-    for (let i = 0; i < COUNT; i++) {
-      const t = i / COUNT;
-      if (t < 0.14) {                                  // header + baseline
-        a[i * 3] = rnd(-span / 2, span / 2);
-        a[i * 3 + 1] = t < 0.07 ? 1.95 : -1.02;
-      } else {
-        const b = i % BARS;
-        a[i * 3] = -span / 2 + b * (bw + gap) + rnd(0.04, bw - 0.04);
-        a[i * 3 + 1] = -1.0 + Math.random() * hts[b];
-      }
-      a[i * 3 + 2] = rnd(-0.03, 0.03);
-    }
-  });
-
-  // Filed away: the outline of a folder, with the receipt back inside it.
-  const folder = f((a) => {
-    const fw = 2.5, fh = 1.75, tabW = 0.95;
-    for (let i = 0; i < COUNT; i++) {
-      const t = i / COUNT;
-      let x, y;
-      if (t < 0.72) {                       // the folder's edge
-        const u = Math.random() * (2 * fw + 2 * fh);
-        if (u < fw)              { x = -fw / 2 + u;             y = -fh / 2; }
-        else if (u < fw + fh)    { x = fw / 2;                  y = -fh / 2 + (u - fw); }
-        else if (u < 2 * fw + fh){ x = fw / 2 - (u - fw - fh);  y = fh / 2; }
-        else                     { x = -fw / 2;                 y = fh / 2 - (u - 2 * fw - fh); }
-        a[i * 3] = x + rnd(-0.02, 0.02);
-        a[i * 3 + 1] = y + rnd(-0.02, 0.02);
-      } else if (t < 0.86) {                // the tab
-        a[i * 3] = -fw / 2 + rnd(0, tabW);
-        a[i * 3 + 1] = fh / 2 + rnd(0, 0.28);
-      } else {                              // a little content inside
-        a[i * 3] = rnd(-fw / 2 + 0.3, fw / 2 - 0.3);
-        a[i * 3 + 1] = rnd(-fh / 2 + 0.25, fh / 2 - 0.25);
-      }
-      a[i * 3 + 2] = rnd(-0.04, 0.04);
-    }
-  });
-
-  return { ink, rows, months, twoFolders, dashboard, share, folder };
-}
-
-/* Chapter keyframes across global page scroll. */
-const KEYS = [
-  [0.00, "ink"],       [0.60, "ink"],   [0.82, "share"],
-  [0.91, "folder"],    [1.00, "folder"],
-];
-
 export function createStory(canvas) {
   let renderer;
   try {
@@ -710,7 +548,7 @@ export function createStory(canvas) {
     vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
     uniforms: { uCyan: { value: CYAN }, uPhaseA: { value: new Vector4(0, 0, 0, 0) },
-                uDraw: { value: 0 }, uThick: { value: 0.016 } },
+                uDraw: { value: 0 }, uGrow: { value: 0 }, uThick: { value: 0.016 } },
   });
   const folders = new Mesh(buildFolders(), folderMat);
   folders.frustumCulled = false;
@@ -727,37 +565,6 @@ export function createStory(canvas) {
   sheet.visible = false;
   scene.add(sheet);
 
-  const F = buildFormations();
-  const geo = new BufferGeometry();
-  geo.setAttribute("position", new BufferAttribute(new Float32Array(COUNT * 3), 3));
-  geo.setAttribute("aStart", new BufferAttribute(F.ink.slice(), 3));
-  geo.setAttribute("aEnd", new BufferAttribute(F.ink.slice(), 3));
-  const seeds = new Float32Array(COUNT);
-  for (let i = 0; i < COUNT; i++) seeds[i] = Math.random();
-  geo.setAttribute("aSeed", new BufferAttribute(seeds, 1));
-
-  const dustMat = new ShaderMaterial({
-    name: "dust",
-    vertexShader: DUST_VERT, fragmentShader: DUST_FRAG,
-    transparent: true, depthWrite: false, blending: AdditiveBlending,
-    uniforms: { uT: { value: 0 }, uSize: { value: 90 }, uAlpha: { value: 0 },
-                uArc: { value: 0.3 }, uCyan: { value: CYAN } },
-  });
-  const dust = new Points(geo, dustMat);
-  scene.add(dust);
-
-  // Swapping formations means rewriting two attributes, so only do it when the
-  // chapter actually changes rather than every frame.
-  let segment = -1;
-  function setSegment(i) {
-    if (i === segment) return;
-    segment = i;
-    geo.attributes.aStart.array.set(F[KEYS[i][1]]);
-    geo.attributes.aEnd.array.set(F[KEYS[i + 1][1]]);
-    geo.attributes.aStart.needsUpdate = true;
-    geo.attributes.aEnd.needsUpdate = true;
-  }
-
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const range = (v, a, b) => clamp01((v - a) / (b - a));
 
@@ -769,7 +576,6 @@ export function createStory(canvas) {
     camera.position.z = w / h < 0.8 ? 12.4 : 9.3;
     camera.position.x = narrow ? 0 : -0.95;
     camera.updateProjectionMatrix();
-    dustMat.uniforms.uSize.value = Math.min(w, h) * 0.10;
   }
 
   /** p is progress through the whole page, 0 at the top, 1 at the bottom. */
@@ -778,26 +584,16 @@ export function createStory(canvas) {
     // 07: the information separates. The receipt keeps the image and moves
     // aside; a second copy of it becomes the row in the sheet.
     const settle = ease(range(p, 0.582, 0.628));
+    // The document and the photograph travel out into the two folders as those
+    // draw, so the folders are where the objects went rather than a new pair of
+    // shapes that replaced them.
+    const intoFolder = ease(range(p, 0.622, 0.686));
+    const FOLDER_X = 2.42, FOLDER_Y = 0.10;
 
-    let i = 0;
-    while (i < KEYS.length - 2 && p >= KEYS[i + 1][0]) i++;
-    setSegment(i);
-    dustMat.uniforms.uT.value = range(p, KEYS[i][0], KEYS[i + 1][0]);
-
-    // The pile is chaotic; ordered formations should not wobble.
-    dustMat.uniforms.uArc.value = p < 0.55 ? 0.26 : 0.06;
-    // Points arrive after the hero and leave before the FAQ.
     // The pile arrives with chapter 01 and empties out as the story advances:
     // that thinning is the promise the page is making.
     crowdMat.uniforms.uAlpha.value = range(p, 0.020, 0.070) * (1 - range(p, 0.330, 0.420));
     crowdMat.uniforms.uCull.value = range(p, 0.100, 0.400);
-
-    // Hold the folder while its chapter is read, then clear the stage so the
-    // call to action is not competing with two thousand dots.
-    // The bars are the chart for this stretch; the cloud would only fight it.
-    const chartHold = range(p, 0.618, 0.652) * (1 - range(p, 0.772, 0.806));
-    dustMat.uniforms.uAlpha.value =
-      0.0 * range(p, 0.792, 0.836) * (1 - range(p, 0.945, 0.985) * 0.96);
 
     paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
@@ -806,18 +602,21 @@ export function createStory(canvas) {
     const scan = range(p, 0.386, 0.442);
     paperMat.uniforms.uScan.value = p >= 0.386 && p <= 0.460 ? scan : -1;
 
-    // The receipt empties out once its numbers have lifted off, then comes
-    // back small inside the folder: the journey ends where it is kept, not in
-    // a puff of particles.
-    const gone = range(p, 0.634, 0.672);
-    const filed = range(p, 0.88, 0.94);
+    // The receipt empties out as it becomes the folder it is filed in. It used
+    // to reappear small at the end, which left a stray dark receipt on screen
+    // during a beat that is about the folders.
+    const gone = range(p, 0.640, 0.690);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
     const arrive = range(p, 0.045, 0.100);
-    paperMat.uniforms.uFade.value = ((1 - gone * 0.998) + filed * 0.92) * clear * arrive;
-    const sc = 0.84 * (1 - settle * 0.44) * (1 - filed * 0.55);
+    paperMat.uniforms.uFade.value = (1 - gone * 0.998) * clear * arrive;
+    const sc = 0.84 * (1 - settle * 0.44) * (1 - intoFolder * 0.30);
     paper.scale.set(sc, sc, 1);
-    paper.position.y = -filed * 0.10;
+
+    // The photograph is what the second folder holds.
+    paper.position.x = 1.75 * settle + intoFolder * (FOLDER_X - 1.75 * settle);
+    const paperY = -0.10 - 0.16 * settle;
+    paper.position.y = paperY + intoFolder * (FOLDER_Y - paperY);
 
     // Edges found, locked, taken. This is what earns the switch to dark.
     // 02 rectangle -> 03 cyan sweeps the paper -> 04 full cyan and a flash
@@ -845,41 +644,37 @@ export function createStory(canvas) {
     capMat.uniforms.uAlpha.value =
       range(p, 0.430, 0.460) * (1 - range(p, 0.548, 0.590));
 
-    // Solid folder outlines draw themselves around the two destinations.
-    // 06 the pair, 08 the hand-off, 09 the one it ends in.
-    const fA = range(p, 0.632, 0.658) * (1 - range(p, 0.696, 0.720));
-    const fB = range(p, 0.810, 0.834) * (1 - range(p, 0.878, 0.900));
-    const fC = 0;   // the stored beat is gone
-    const fD = range(p, 0.702, 0.726) * (1 - range(p, 0.772, 0.794));   // dashboard
-    folderMat.uniforms.uPhaseA.value.set(fA, fB, fC, fD);
-    folderMat.uniforms.uDraw.value =
-      p < 0.690 ? ease(range(p, 0.630, 0.686))
-               : p < 0.800 ? ease(range(p, 0.704, 0.762))
-               : p < 0.86 ? ease(range(p, 0.812, 0.870))
-                          : ease(range(p, 0.812, 0.870));
-    folders.visible = Math.max(Math.max(fA, fB), Math.max(fC, fD)) > 0.005;
+    /* One pair of folders carries the last three beats. They draw once and
+       stay lit; the spending rises between them; the rule runs under both. The
+       old version faded the folders out and brought a different set back twice,
+       which is what made this stretch read as three unrelated scenes. */
+    const fPair  = range(p, 0.618, 0.664) * (1 - range(p, 0.930, 0.958));
+    const fBars  = range(p, 0.734, 0.782) * (1 - range(p, 0.886, 0.918));
+    const fLink  = range(p, 0.846, 0.892) * (1 - range(p, 0.930, 0.958));
+    folderMat.uniforms.uPhaseA.value.set(fPair, fBars, fLink, 0);
+    // Two growths, because the folders finish drawing long before the chart
+    // starts and a single shared value cannot express both.
+    folderMat.uniforms.uDraw.value = ease(range(p, 0.616, 0.688));
+    folderMat.uniforms.uGrow.value = ease(range(p, 0.730, 0.788));
+    folders.visible = Math.max(fPair, Math.max(fBars, fLink)) > 0.005;
 
-    // 10 the rows condense toward the ring rather than simply fading.
-    const toDash = ease(range(p, 0.636, 0.676));
-    sheet.visible = settle > 0.001 && p < 0.70;
-    sheetMat.opacity = range(p, 0.578, 0.606) * (1 - range(p, 0.634, 0.670));
+    sheet.visible = settle > 0.001 && p < 0.72;
+    sheetMat.opacity = range(p, 0.578, 0.606) * (1 - range(p, 0.640, 0.690));
 
     // Reveal by showing only the left fraction of the texture at 1:1, so the
     // sheet writes itself in rather than stretching.
     const wipe = Math.max(0.001, ease(range(p, 0.584, 0.630)));
     sheetTex.repeat.x = wipe;
-    const ss = 0.30 + 0.70 * settle;
+    // Shrinks as it travels, so it settles into the folder rather than
+    // sliding behind it at full size.
+    const ss = (0.30 + 0.70 * settle) * (1 - intoFolder * 0.36);
     const fullW = SHEET_W * ss, w = fullW * wipe;
     sheet.scale.set(w, SHEET_H * ss, 1);
-    // Position first, then condense toward the dashboard. The old order set
-    // the position after the condense and threw the condense away.
-    sheet.position.set(-1.95 * settle - (fullW - w) / 2, 0.30 * settle, -0.05);
-    sheet.position.x += toDash * (0 - sheet.position.x);
-    sheet.position.y += toDash * (1.15 - sheet.position.y);
-
-    // The paper itself becomes the supporting document.
-    paper.position.x = 1.75 * settle;
-    paper.position.y = -0.10 - 0.16 * settle;
+    const sheetX = -1.95 * settle - (fullW - w) / 2, sheetY = 0.30 * settle;
+    sheet.position.set(
+      sheetX + intoFolder * (-FOLDER_X - sheetX),
+      sheetY + intoFolder * (FOLDER_Y - sheetY),
+      -0.05);
 
     camera.position.y = -0.42 - range(p, 0.6, 0.95) * 0.25;
   }
@@ -889,7 +684,6 @@ export function createStory(canvas) {
     render() { renderer.render(scene, camera); },
     dispose() {
       paper.geometry.dispose(); paperMat.dispose();
-      geo.dispose(); dustMat.dispose();
       crowd.geometry.dispose(); crowdMat.dispose();
       capture.geometry.dispose(); capMat.dispose();
       folders.geometry.dispose(); folderMat.dispose();

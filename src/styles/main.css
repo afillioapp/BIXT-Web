@@ -119,21 +119,6 @@ body {
   max-width: none; margin-inline: 0;
 }
 
-/* Words left, phone right. The padding-bottom lifts the pair off the optical
-   centre, which reads as centred once the nav is accounted for. */
-.hero {
-  width: 100%; max-width: 1080px; margin-inline: auto;
-  display: grid; gap: clamp(30px, 4vw, 64px); align-items: center;
-}
-@media (min-width: 900px) {
-.hero { grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr); }
-}
-
-.hero__phone { justify-self: center; width: min(252px, 58vw); }
-@media (min-width: 900px) {
-.hero__phone { justify-self: end; width: min(286px, 27vw); }
-}
-
 /* The device is drawn rather than shipped as a PNG, so it inherits the page's
    own shadow language instead of a stock mockup's. */
 .phone {
@@ -241,12 +226,23 @@ body {
 /* Categories: the recognised one lights up, the rest stay quiet. */
 .cats { list-style: none; display: flex; flex-wrap: wrap; gap: 9px; margin: 28px 0 0; padding: 0; }
 
-.ch__text--cta { text-align: center; align-items: center; display: flex;
-  flex-direction: column; gap: 15px; }
+.ch--cta .ch__text { top: 50%; translate: 0 -50%; }
+.ch__text--cta { text-align: center; }
 .ch__text--cta .display--sm { font-size: clamp(1.625rem, 4.2vw, 3rem); }
-.ch__text--cta .eyebrow { justify-content: center; }
-.ch__text--cta .measure { max-width: 44ch; }
+.ch__text--cta .measure { max-width: 42ch; }
 .ch__text--cta .btn { margin-top: 6px; }
+
+/* The offer and the thing itself, side by side: the last frame shows the app
+   the whole story has been describing. Stacks with the phone under the CTA. */
+.cta { display: grid; gap: clamp(26px, 4vw, 64px); align-items: center; justify-items: center; }
+.cta__copy { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.cta__phone { width: min(186px, 42vw); }
+@media (min-width: 900px) {
+.cta { grid-template-columns: minmax(0, 1fr) auto; justify-items: start; text-align: left; }
+.cta__copy { align-items: flex-start; }
+.cta__phone { width: min(258px, 23vw); }
+.ch__text--cta { text-align: left; }
+}
 
 @media (max-width: 859px) {
   .ch__text { top: 57svh; }
@@ -283,11 +279,13 @@ body {
 
 /* ---------- scroll progress ---------- */
 
-.progress { position: fixed; left: 0; right: 0; top: 64px; height: 3px; z-index: 60;
+/* A hairline along the very bottom. No glow, no label, no number: it reports
+   position and nothing else. Sits above the home indicator on iOS. */
+.progress { position: fixed; left: 0; right: 0; z-index: 60;
+  bottom: env(safe-area-inset-bottom, 0px); height: 2px;
   background: color-mix(in oklab, var(--ink) 9%, transparent); pointer-events: none; }
 .progress__bar { display: block; height: 100%; width: 100%; transform: scaleX(0);
-  transform-origin: left center; background: var(--cyan);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--cyan) 55%, transparent); }
+  transform-origin: left center; background: var(--cyan); }
 
 /* ---------- reveal (hero + faq only) ---------- */
 
