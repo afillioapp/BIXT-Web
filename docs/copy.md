@@ -39,7 +39,7 @@ chapters.
 | — | — | No **paper** receipts. / *Just Bixt it.* | Hero. No buttons: the only call to action is at the end of the story. |
 | 01 | Where it starts | **Receipts** everywhere. | In the van. In a pocket. Never where you need them. |
 | 02 | Snap it | Take a **photo**. | That is the whole job. There is no second part. |
-| 03 | It gets read | **Numbers** come off. | Claude reads them. You check before anything saves. |
+| 03 | It gets read | **Numbers** come off. | We read them. You check before anything saves. |
 | 04 | It gets filed | Filed by **month**. | Photo and spreadsheet row. Nothing to name. |
 | 05 | A year, handled | **Twelve months**, done. | Carried by the 12 / 1 / 0 stat row. |
 | 06 | How it ends | Your **accountant** sees. | Same folder, read only, always current. Nothing to send. |

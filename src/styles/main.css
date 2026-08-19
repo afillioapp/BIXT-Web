@@ -80,38 +80,31 @@ body {
    always belongs to the art you are looking at. Without this the copy scrolls
    off the top while its scene is still playing. */
 .ch__text {
-  position: sticky; top: 0;
-  height: 100svh;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  padding-bottom: 13vh;
+  position: fixed; z-index: 2;
+  left: 0; right: 0; top: 46svh; bottom: auto;
   width: 100%; max-width: 1080px; margin-inline: auto;
+  padding-inline: var(--gutter);
+  opacity: 0; pointer-events: none;
+  transition: opacity 600ms var(--ease);
 }
+.ch.is-on .ch__text { opacity: 1; pointer-events: auto; }
 .ch--hero .ch__text, .ch--cta .ch__text {
-  position: static; height: auto; justify-content: center; padding-bottom: 0;
+  position: static; opacity: 1; pointer-events: auto; padding-inline: 0;
 }
 .ch__text--center { align-items: center; }
 .ch__text--center { text-align: center; }
-.ch__text > * { flex: none; }
-.ch__text--hero > * + * { margin-top: 32px; }
+.ch__text--hero > * + * { margin-top: clamp(20px, 3.4vh, 44px); }
 
 /* Each chapter fades up as it takes the stage. */
-.ch__text > * {
-  opacity: 0; transform: translateY(20px);
-  transition: opacity 700ms var(--ease), transform 700ms var(--ease);
-}
-.ch.is-on .ch__text > * { opacity: 1; transform: none; }
-.ch.is-on .ch__text > *:nth-child(2) { transition-delay: 90ms; }
-.ch.is-on .ch__text > *:nth-child(3) { transition-delay: 180ms; }
-.ch.is-on .ch__text > *:nth-child(4) { transition-delay: 270ms; }
-.ch.is-on .ch__text > *:nth-child(5) { transition-delay: 360ms; }
-.ch.is-on .ch__text > *:nth-child(6) { transition-delay: 450ms; }
+
 
 .ch__hint {
-  position: absolute; left: 50%; bottom: 42px; translate: -50% 0;
-  width: 1px; height: 56px; background: var(--rule); overflow: hidden;
+  position: absolute; left: 50%; bottom: 13vh; translate: -50% 0;
+  width: 3px; height: 68px; border-radius: 3px; overflow: hidden;
+  background: color-mix(in oklab, var(--ink) 14%, transparent);
 }
-.ch__hint span { display: block; width: 100%; height: 40%; background: var(--cyan);
-  animation: hint 2.4s var(--ease) infinite; }
+.ch__hint span { display: block; width: 100%; height: 42%; border-radius: 3px;
+  background: var(--cyan); animation: hint 2.4s var(--ease) infinite; }
 @keyframes hint { 0% { transform: translateY(-100%); } 100% { transform: translateY(250%); } }
 @media (prefers-reduced-motion: reduce) { .ch__hint { display: none; } }
 
@@ -166,11 +159,13 @@ body {
 .btn--ghost:hover { transform: translateY(-2px); border-color: var(--cyan); color: var(--cyan-deep); }
 @media (prefers-reduced-motion: reduce) { .btn:hover { transform: none; } }
 
-.ch--hero .display { font-size: clamp(2.5rem, 9vw, 7rem); }
+.ch--hero .display { font-size: clamp(2.125rem, 6.2vw, 4.75rem); }
 .hero__tag {
-  margin: 0; font-weight: 600; color: var(--cyan-deep);
-  font-size: clamp(1.25rem, 2.6vw, 2rem); letter-spacing: -0.02em;
+  margin: 0; font-weight: 500; color: var(--ink-soft);
+  font-size: clamp(1.0625rem, 1.8vw, 1.5rem); line-height: 1.35;
+  letter-spacing: -0.015em; max-width: 36ch;
 }
+.hero__tag .hl { font-weight: 700; }
 
 /* ---------- nav ---------- */
 
@@ -279,6 +274,7 @@ body {
   transition-delay: calc(var(--d, 0) * 80ms); }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal, .ch__text > * { opacity: 1; transform: none; }
-  .reveal.is-in, .ch.is-on .ch__text > * { transition: none; }
+  .reveal { opacity: 1; transform: none; }
+  .reveal.is-in { transition: none; }
+  .ch__text { transition: none; }
 }

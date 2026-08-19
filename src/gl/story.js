@@ -2,7 +2,7 @@
 
    The scene is a single paper receipt plus one cloud of points. The points
    are re-aimed at a different formation each chapter, so the same particles
-   carry the narrative the whole way down: a scattered pile of receipts →
+   carry the narrative the whole way down: the ink of one receipt →
    the ink of one receipt → rows of a spreadsheet → twelve month folders →
    you and your accountant looking at the same thing → gone.
 
@@ -12,8 +12,11 @@
 
 import {
   Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry, BufferGeometry,
+  InstancedBufferGeometry, InstancedBufferAttribute,
   BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending,
 } from "three";
+
+const rnd = (a, b) => a + Math.random() * (b - a);
 
 const INK = new Color("#111a2d");
 const CYAN = new Color("#009b95");
@@ -109,6 +112,84 @@ const PAPER_FRAG = /* glsl */ `
   }
 `;
 
+/* ---------- the pile: many receipts, out of focus ---------- */
+
+const CROWD = 54;
+
+const CROWD_VERT = /* glsl */ `
+  attribute vec3 aOffset;
+  attribute vec2 aScale;
+  attribute float aRot;
+  attribute float aSeed;
+  uniform float uCull, uAlpha;
+  varying vec2 vUv;
+  varying float vA, vSeed;
+
+  void main() {
+    vUv = uv;
+    vSeed = aSeed;
+    // As uCull rises the pile thins out, one receipt at a time.
+    vA = uAlpha * step(uCull, aSeed);
+    vec2 p = position.xy * aScale;
+    float c = cos(aRot), sn = sin(aRot);
+    vec3 world = vec3(p.x * c - p.y * sn, p.x * sn + p.y * c, 0.0) + aOffset;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(world, 1.0);
+  }
+`;
+
+const CROWD_FRAG = /* glsl */ `
+  uniform vec3 uInk;
+  varying vec2 vUv;
+  varying float vA, vSeed;
+
+  void main() {
+    if (vA < 0.01) discard;
+    // No post-processing pass: depth of field is faked by softening the edges
+    // and the printing in step with how far back the receipt sits.
+    float blur = 0.07 + vSeed * 0.20;
+    float mask = smoothstep(0.0, blur, vUv.x) * smoothstep(1.0, 1.0 - blur, vUv.x)
+               * smoothstep(0.0, blur * 0.45, vUv.y) * smoothstep(1.0, 1.0 - blur * 0.45, vUv.y);
+
+    float lines = 0.0;
+    for (int i = 0; i < 6; i++) {
+      float y = 0.80 - float(i) * 0.12;
+      lines += smoothstep(0.015 + blur * 0.6, 0.0, abs(vUv.y - y))
+             * step(0.20, vUv.x) * step(vUv.x, 0.76);
+    }
+    vec3 col = mix(vec3(1.0), uInk, clamp(lines, 0.0, 1.0) * 0.22 * (1.0 - blur * 1.8));
+    gl_FragColor = vec4(col, mask * vA * (0.68 - vSeed * 0.26));
+  }
+`;
+
+function buildCrowd() {
+  const base = new PlaneGeometry(1, 1);
+  const g = new InstancedBufferGeometry();
+  g.index = base.index;
+  g.attributes.position = base.attributes.position;
+  g.attributes.uv = base.attributes.uv;
+  g.instanceCount = CROWD;
+
+  const off = new Float32Array(CROWD * 3);
+  const scl = new Float32Array(CROWD * 2);
+  const rot = new Float32Array(CROWD);
+  const sed = new Float32Array(CROWD);
+  for (let i = 0; i < CROWD; i++) {
+    off[i * 3] = rnd(-5.0, 5.0);
+    off[i * 3 + 1] = rnd(-3.2, 3.2);
+    off[i * 3 + 2] = rnd(-4.2, -0.9);          // always behind the hero receipt
+    const w = rnd(0.42, 0.86);
+    scl[i * 2] = w;
+    scl[i * 2 + 1] = w * rnd(2.1, 3.2);        // till-roll proportions
+    rot[i] = rnd(-0.9, 0.9);
+    sed[i] = Math.random();
+  }
+  g.setAttribute("aOffset", new InstancedBufferAttribute(off, 3));
+  g.setAttribute("aScale", new InstancedBufferAttribute(scl, 2));
+  g.setAttribute("aRot", new InstancedBufferAttribute(rot, 1));
+  g.setAttribute("aSeed", new InstancedBufferAttribute(sed, 1));
+  return g;
+}
+
 /* ---------- points ---------- */
 
 const DUST_VERT = /* glsl */ `
@@ -142,17 +223,8 @@ const DUST_FRAG = /* glsl */ `
 
 /* ---------- formations ---------- */
 
-const rnd = (a, b) => a + Math.random() * (b - a);
-
 function buildFormations() {
   const f = (fn) => { const a = new Float32Array(COUNT * 3); fn(a); return a; };
-
-  // The shoebox: paper everywhere, no order.
-  const scatter = f((a) => {
-    for (let i = 0; i < COUNT; i++) {
-      a[i * 3] = rnd(-2.9, 2.9); a[i * 3 + 1] = rnd(-2.0, 2.0); a[i * 3 + 2] = rnd(-1.4, 1.0);
-    }
-  });
 
   // The ink of one receipt — header, items, prices, total.
   const ink = f((a) => {
@@ -230,14 +302,13 @@ function buildFormations() {
     }
   });
 
-  return { scatter, ink, rows, months, share, folder };
+  return { ink, rows, months, share, folder };
 }
 
 /* Chapter keyframes across global page scroll. */
 const KEYS = [
-  [0.00, "scatter"], [0.12, "scatter"], [0.26, "ink"],   [0.42, "ink"],
-  [0.56, "rows"],    [0.68, "months"],  [0.78, "share"], [0.88, "folder"],
-  [1.00, "folder"],
+  [0.00, "ink"],    [0.42, "ink"],   [0.56, "rows"],   [0.68, "months"],
+  [0.78, "share"],  [0.88, "folder"], [1.00, "folder"],
 ];
 
 export function createStory(canvas) {
@@ -262,11 +333,21 @@ export function createStory(canvas) {
   const paper = new Mesh(new PlaneGeometry(W, H, 48, 64), paperMat);
   scene.add(paper);
 
+  const crowdMat = new ShaderMaterial({
+    vertexShader: CROWD_VERT, fragmentShader: CROWD_FRAG,
+    transparent: true, depthWrite: false,
+    uniforms: { uCull: { value: 0 }, uAlpha: { value: 0 }, uInk: { value: INK } },
+  });
+  const crowd = new Mesh(buildCrowd(), crowdMat);
+  crowd.renderOrder = -1;
+  crowd.frustumCulled = false;
+  scene.add(crowd);
+
   const F = buildFormations();
   const geo = new BufferGeometry();
   geo.setAttribute("position", new BufferAttribute(new Float32Array(COUNT * 3), 3));
-  geo.setAttribute("aStart", new BufferAttribute(F.scatter.slice(), 3));
-  geo.setAttribute("aEnd", new BufferAttribute(F.scatter.slice(), 3));
+  geo.setAttribute("aStart", new BufferAttribute(F.ink.slice(), 3));
+  geo.setAttribute("aEnd", new BufferAttribute(F.ink.slice(), 3));
   const seeds = new Float32Array(COUNT);
   for (let i = 0; i < COUNT; i++) seeds[i] = Math.random();
   geo.setAttribute("aSeed", new BufferAttribute(seeds, 1));
@@ -312,13 +393,17 @@ export function createStory(canvas) {
     dustMat.uniforms.uT.value = range(p, KEYS[i][0], KEYS[i + 1][0]);
 
     // The pile is chaotic; ordered formations should not wobble.
-    dustMat.uniforms.uArc.value = p < 0.30 ? 0.55 : p < 0.62 ? 0.30 : 0.08;
+    dustMat.uniforms.uArc.value = p < 0.62 ? 0.26 : 0.08;
     // Points arrive after the hero and leave before the FAQ.
-    const onPaper = range(p, 0.20, 0.27) * (1 - range(p, 0.42, 0.52));
+    // The pile arrives with chapter 01 and empties out as the story advances:
+    // that thinning is the promise the page is making.
+    crowdMat.uniforms.uAlpha.value = range(p, 0.03, 0.09) * (1 - range(p, 0.40, 0.54));
+    crowdMat.uniforms.uCull.value = range(p, 0.12, 0.46);
+
     // Hold the folder while its chapter is read, then clear the stage so the
     // call to action is not competing with two thousand dots.
     dustMat.uniforms.uAlpha.value =
-      range(p, 0.05, 0.12) * (1 - range(p, 0.915, 0.965) * 0.96) * (1 - 0.62 * onPaper);
+      range(p, 0.34, 0.46) * (1 - range(p, 0.915, 0.965) * 0.96);
 
     paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
@@ -334,7 +419,8 @@ export function createStory(canvas) {
     const filed = range(p, 0.80, 0.87);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.915, 0.965);
-    paperMat.uniforms.uFade.value = ((1 - gone * 0.97) + filed * 0.92) * clear;
+    const arrive = range(p, 0.045, 0.10);
+    paperMat.uniforms.uFade.value = ((1 - gone * 0.97) + filed * 0.92) * clear * arrive;
     const sc = 1 - filed * 0.72;
     paper.scale.set(sc, sc, 1);
     paper.position.y = -filed * 0.10;
@@ -347,7 +433,9 @@ export function createStory(canvas) {
     render() { renderer.render(scene, camera); },
     dispose() {
       paper.geometry.dispose(); paperMat.dispose();
-      geo.dispose(); dustMat.dispose(); renderer.dispose();
+      geo.dispose(); dustMat.dispose();
+      crowd.geometry.dispose(); crowdMat.dispose();
+      renderer.dispose();
     },
   };
 }
