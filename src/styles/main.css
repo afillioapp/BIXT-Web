@@ -8,6 +8,8 @@
   --ink-faint:  oklch(0.62 0.02 264);
   --cyan:       oklch(0.62 0.11 190);
   --cyan-deep:  oklch(0.46 0.085 195);
+  --cyan-btn:   oklch(0.54 0.11 190);
+  --cyan-btn-h: oklch(0.49 0.11 190);
   --paper:      oklch(0.97 0.005 260);
   --paper-pure: oklch(1 0 0);
   --rule:       oklch(0.90 0.008 260);
@@ -128,8 +130,8 @@ body {
 .btn--sm { padding: 9px 18px; font-size: 0.9375rem; }
 .btn--lg { padding: 18px 40px; font-size: 1.0625rem; }
 
-.btn--solid { background: var(--cyan); color: var(--ink); }
-.btn--solid:hover { transform: translateY(-2px); background: var(--cyan-lift); }
+.btn--solid { background: var(--cyan-btn); color: #fff; }
+.btn--solid:hover { transform: translateY(-2px); background: var(--cyan-btn-h); }
 
 .btn--ghost { color: var(--ink); border: 1px solid var(--rule); background: transparent; }
 .btn--ghost:hover { transform: translateY(-2px); border-color: var(--cyan); color: var(--cyan-deep); }
