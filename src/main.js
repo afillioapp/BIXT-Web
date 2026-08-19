@@ -115,8 +115,15 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   };
   const kick = () => { if (queued || !running) return; queued = true; requestAnimationFrame(loop); };
 
+  // Chapters 05 to 07 run dark, then the page returns to paper for the
+  // call to action.
+  const paintTheme = (sp) =>
+    document.body.classList.toggle("is-dark", sp > 0.475 && sp < 0.855);
+  paintTheme(target);
+
   addEventListener("scroll", () => {
     target = storyProgress();
+    paintTheme(target);
     paintBar(pageProgress());
     kick();
   }, { passive: true });

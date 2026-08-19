@@ -277,6 +277,52 @@ function buildFormations() {
     }
   });
 
+  // What Drive actually holds: the Expenses sheet, and Supporting Documents.
+  const twoFolders = f((a) => {
+    const fw = 1.55, fh = 1.15, gap = 0.42;
+    for (let i = 0; i < COUNT; i++) {
+      const right = i % 2 === 1;
+      const cx = right ? (fw / 2 + gap / 2) : -(fw / 2 + gap / 2);
+      const t = Math.random();
+      let x, y;
+      if (t < 0.62) {                                  // edge
+        const u = Math.random() * (2 * fw + 2 * fh);
+        if (u < fw)               { x = -fw / 2 + u;            y = -fh / 2; }
+        else if (u < fw + fh)     { x = fw / 2;                 y = -fh / 2 + (u - fw); }
+        else if (u < 2 * fw + fh) { x = fw / 2 - (u - fw - fh); y = fh / 2; }
+        else                      { x = -fw / 2;                y = fh / 2 - (u - 2 * fw - fh); }
+      } else if (t < 0.74) {                           // tab
+        x = -fw / 2 + rnd(0, 0.62); y = fh / 2 + rnd(0, 0.20);
+      } else if (right) {                              // photos stacked inside
+        x = rnd(-0.42, 0.42); y = rnd(-0.34, 0.30);
+      } else {                                         // sheet rows inside
+        const row = i % 5;
+        x = rnd(-0.52, 0.52); y = 0.30 - row * 0.15;
+      }
+      a[i * 3] = cx + x + rnd(-0.015, 0.015);
+      a[i * 3 + 1] = y + rnd(-0.015, 0.015);
+      a[i * 3 + 2] = rnd(-0.04, 0.04);
+    }
+  });
+
+  // The dashboard in the app: a run of monthly bars under a header rule.
+  const dashboard = f((a) => {
+    const BARS = 7, bw = 0.42, gap = 0.20, span = BARS * bw + (BARS - 1) * gap;
+    const hts = [0.55, 0.95, 0.72, 1.35, 1.05, 1.6, 1.25];
+    for (let i = 0; i < COUNT; i++) {
+      const t = i / COUNT;
+      if (t < 0.14) {                                  // header + baseline
+        a[i * 3] = rnd(-span / 2, span / 2);
+        a[i * 3 + 1] = t < 0.07 ? 1.95 : -1.02;
+      } else {
+        const b = i % BARS;
+        a[i * 3] = -span / 2 + b * (bw + gap) + rnd(0.04, bw - 0.04);
+        a[i * 3 + 1] = -1.0 + Math.random() * hts[b];
+      }
+      a[i * 3 + 2] = rnd(-0.03, 0.03);
+    }
+  });
+
   // Filed away: the outline of a folder, with the receipt back inside it.
   const folder = f((a) => {
     const fw = 2.5, fh = 1.75, tabW = 0.95;
@@ -302,13 +348,13 @@ function buildFormations() {
     }
   });
 
-  return { ink, rows, months, share, folder };
+  return { ink, rows, months, twoFolders, dashboard, share, folder };
 }
 
 /* Chapter keyframes across global page scroll. */
 const KEYS = [
-  [0.00, "ink"],    [0.42, "ink"],   [0.56, "rows"],   [0.68, "months"],
-  [0.78, "share"],  [0.88, "folder"], [1.00, "folder"],
+  [0.00, "ink"],       [0.44, "ink"],   [0.555, "twoFolders"],
+  [0.665, "dashboard"], [0.775, "share"], [0.885, "folder"], [1.00, "folder"],
 ];
 
 export function createStory(canvas) {
@@ -393,7 +439,7 @@ export function createStory(canvas) {
     dustMat.uniforms.uT.value = range(p, KEYS[i][0], KEYS[i + 1][0]);
 
     // The pile is chaotic; ordered formations should not wobble.
-    dustMat.uniforms.uArc.value = p < 0.62 ? 0.26 : 0.08;
+    dustMat.uniforms.uArc.value = p < 0.55 ? 0.26 : 0.06;
     // Points arrive after the hero and leave before the FAQ.
     // The pile arrives with chapter 01 and empties out as the story advances:
     // that thinning is the promise the page is making.
@@ -403,7 +449,7 @@ export function createStory(canvas) {
     // Hold the folder while its chapter is read, then clear the stage so the
     // call to action is not competing with two thousand dots.
     dustMat.uniforms.uAlpha.value =
-      range(p, 0.34, 0.46) * (1 - range(p, 0.915, 0.965) * 0.96);
+      range(p, 0.34, 0.46) * (1 - range(p, 0.945, 0.985) * 0.96);
 
     paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
@@ -416,11 +462,11 @@ export function createStory(canvas) {
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
     const gone = range(p, 0.46, 0.58);
-    const filed = range(p, 0.80, 0.87);
+    const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
-    const clear = 1 - range(p, 0.915, 0.965);
+    const clear = 1 - range(p, 0.945, 0.985);
     const arrive = range(p, 0.045, 0.10);
-    paperMat.uniforms.uFade.value = ((1 - gone * 0.97) + filed * 0.92) * clear * arrive;
+    paperMat.uniforms.uFade.value = ((1 - gone * 0.998) + filed * 0.92) * clear * arrive;
     const sc = 1 - filed * 0.72;
     paper.scale.set(sc, sc, 1);
     paper.position.y = -filed * 0.10;

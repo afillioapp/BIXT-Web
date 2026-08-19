@@ -27,6 +27,20 @@
 @media (min-width: 641px)  { :root { --gutter: 40px; } }
 @media (min-width: 1025px) { :root { --gutter: 64px; } }
 
+/* The middle of the journey runs on the dark ground. Everything is token
+   driven, so the whole page inverts by swapping the tokens; --cyan-deep has
+   to go lighter here or it disappears against the dark. */
+body.is-dark {
+  --paper:      oklch(0.205 0.035 264);
+  --paper-pure: oklch(0.26 0.035 264);
+  --ink:        oklch(0.97 0.005 260);
+  --ink-soft:   oklch(0.80 0.015 260);
+  --ink-faint:  oklch(0.63 0.02 260);
+  --rule:       oklch(1 0 0 / 0.16);
+  --cyan-deep:  oklch(0.80 0.10 190);
+}
+body { transition: background-color 800ms var(--ease), color 800ms var(--ease); }
+
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
@@ -73,7 +87,7 @@ body {
 
 /* ---------- chapters ---------- */
 
-.ch { position: relative; z-index: 1; min-height: 210svh; padding-inline: var(--gutter); }
+.ch { position: relative; z-index: 1; min-height: 185svh; padding-inline: var(--gutter); }
 .ch--hero, .ch--cta { min-height: 100svh; display: grid; align-items: center; }
 
 /* The words pin for the length of their chapter, so the text you are reading
@@ -202,6 +216,14 @@ body {
 .path__seg--lit { background: color-mix(in oklab, var(--cyan) 14%, var(--paper-pure));
   border-color: color-mix(in oklab, var(--cyan) 45%, transparent); color: var(--cyan-deep); font-weight: 600; }
 .path__sep { color: var(--ink-faint); }
+
+.pair { display: grid; gap: 12px; margin-top: 28px; max-width: 460px; }
+@media (min-width: 620px) { .pair { grid-template-columns: 1fr 1fr; } }
+.pair__box { display: block; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid var(--rule); background: var(--paper-pure);
+  font-size: 0.8125rem; color: var(--ink-faint); line-height: 1.45; }
+.pair__box b { display: block; font-size: 0.9375rem; font-weight: 600;
+  color: var(--cyan-deep); margin-bottom: 2px; }
 
 .stats { display: grid; gap: 32px; margin-top: 40px; }
 @media (min-width: 700px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 780px; } }
