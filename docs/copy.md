@@ -14,7 +14,7 @@
 - Button: `Get BX`
 
 ## Hero
-- **Headline:** Your receipts. Already with your accountant.
+- **Headline:** Your receipts, already with your accountant.
 - **Sub:** Take a photo. BX reads it, files it in your own Google Drive, and your accountant can already see it.
 - Primary button: `Get BX — $3 a month`
 - Secondary button: `See how it works`
@@ -97,5 +97,5 @@ Yes. It’s a website, so it works in any browser. Most people use their phone b
 ## Metadata
 - **Title (58 chars):** BX — Receipts filed, and your accountant already has them
 - **Meta description (152 chars):** Take a photo of a receipt. BX reads it and files it in your own Google Drive, where your accountant can already see it. $3 a month. No shoebox.
-- **OG title:** Your receipts. Already with your accountant.
+- **OG title:** Your receipts, already with your accountant.
 - **OG description:** Snap a receipt. BX reads it and files it in your own Google Drive — your accountant sees it without you sending anything.
