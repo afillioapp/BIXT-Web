@@ -118,7 +118,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   // Chapters 05 to 07 run dark, then the page returns to paper for the
   // call to action.
   const paintTheme = (sp) =>
-    document.body.classList.toggle("is-dark", sp > 0.475 && sp < 0.855);
+    document.body.classList.toggle("is-dark", sp > 0.497 && sp < 0.855);
   paintTheme(target);
 
   addEventListener("scroll", () => {

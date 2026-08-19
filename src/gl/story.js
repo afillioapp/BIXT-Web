@@ -13,7 +13,7 @@
 import {
   Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry, BufferGeometry,
   InstancedBufferGeometry, InstancedBufferAttribute,
-  BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending,
+  BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, CanvasTexture, SRGBColorSpace,
 } from "three";
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -47,8 +47,9 @@ const PAPER_VERT = /* glsl */ `
 `;
 
 const PAPER_FRAG = /* glsl */ `
-  uniform float uScan, uFade;
+  uniform float uScan, uFade, uReveal;
   uniform vec3 uInk, uCyan;
+  uniform sampler2D uTex;
   varying vec2 vUv; varying float vShade;
 
   // A horizontal rule from x0..x1 at height y, half-thickness h.
@@ -96,6 +97,12 @@ const PAPER_FRAG = /* glsl */ `
     float bars = step(0.45, fract(vUv.x * 38.0)) * step(0.115, vUv.y) * step(vUv.y, 0.165)
                * step(0.20, vUv.x) * step(vUv.x, 0.80);
     col = mix(col, uInk, bars * 0.72);
+
+    // What we actually read off it, once the capture has landed.
+    if (uReveal > 0.001) {
+      vec3 shot = texture2D(uTex, vUv).rgb * (1.0 - vShade * 0.85);
+      col = mix(col, shot, uReveal);
+    }
 
     if (uScan >= 0.0) {
       float d = abs(vUv.y - (1.0 - uScan));
@@ -218,6 +225,122 @@ const DUST_FRAG = /* glsl */ `
     float d = length(gl_PointCoord - 0.5);
     if (d > 0.5) discard;
     gl_FragColor = vec4(uCyan, vAlpha * smoothstep(0.5, 0.0, d));
+  }
+`;
+
+/* ---------- the read receipt ---------- */
+
+/* Once the capture lands, the paper stops being abstract lines and shows what
+   was actually taken off it: vendor, date, line items, subtotal, HST, total.
+   Drawn to a canvas because that is the cheapest way to get real, legible
+   type onto a texture without shipping a font atlas. */
+function makeReceiptTexture() {
+  const w = 440, h = 1180;
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const x = cv.getContext("2d");
+  const INKC = "#111a2d", CY = "#00827d", MUT = "#5c6472";
+
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, w, h);
+  const mono = (px, weight = "400") => `${weight} ${px}px ui-monospace, "SF Mono", Menlo, monospace`;
+  const L = 46, R = w - 46;
+
+  const rule = (y, dash) => {
+    x.strokeStyle = "#c9ced8"; x.lineWidth = 2;
+    x.setLineDash(dash ? [6, 7] : []);
+    x.beginPath(); x.moveTo(L, y); x.lineTo(R, y); x.stroke();
+    x.setLineDash([]);
+  };
+  const row = (y, label, val, opts = {}) => {
+    x.fillStyle = opts.mut ? MUT : (opts.color || INKC);
+    x.font = mono(opts.size || 25, opts.weight || "400");
+    x.textAlign = "left";  x.fillText(label, L, y);
+    if (val !== undefined) { x.textAlign = "right"; x.fillText(val, R, y); }
+  };
+
+  x.textAlign = "center"; x.fillStyle = INKC; x.font = mono(40, "700");
+  x.fillText("ESSO", w / 2, 96);
+  x.fillStyle = MUT; x.font = mono(22);
+  x.fillText("1240 King St W", w / 2, 136);
+  x.fillText("Toronto, ON", w / 2, 168);
+
+  rule(206, true);
+  row(248, "12 Aug 2026", "14:32", { mut: true, size: 23 });
+  rule(286, true);
+
+  row(340, "Unleaded 38.4L", "66.85");
+  row(388, "Car wash", "12.00");
+  row(436, "Coffee", "2.49");
+  row(484, "Wiper fluid", "6.99");
+
+  rule(530, true);
+  row(578, "SUBTOTAL", "$88.33", { mut: true, size: 24 });
+  row(626, "HST 13%", "$11.48", { mut: true, size: 24 });
+  rule(664, false);
+  row(722, "TOTAL", "$99.81", { size: 34, weight: "700", color: CY });
+  rule(766, true);
+
+  x.fillStyle = MUT; x.font = mono(21); x.textAlign = "center";
+  x.fillText("VISA ****4417  ·  CAD", w / 2, 812);
+
+  x.fillStyle = INKC;
+  for (let i = 0, px = 96; px < w - 96; i++, px += 7) {
+    if (i % 3) x.fillRect(px, 880, i % 2 ? 3 : 5, 78);
+  }
+
+  const t = new CanvasTexture(cv);
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/* ---------- capture frame ---------- */
+
+/* The viewfinder that finds the receipt's edges, locks on, and takes it.
+   Drawn in the plane's own coordinates so the brackets can start loose and
+   converge onto the paper's real bounds. */
+
+const CAP_VERT = /* glsl */ `
+  varying vec2 vPos;
+  void main() {
+    vPos = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const CAP_FRAG = /* glsl */ `
+  uniform vec2 uHalf;
+  uniform float uAlpha, uThick, uLen, uFull, uFlash;
+  uniform vec3 uCyan;
+  varying vec2 vPos;
+
+  float seg(vec2 p, vec2 a, vec2 b, float t) {
+    vec2 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return smoothstep(t, 0.0, length(pa - ba * h));
+  }
+
+  void main() {
+    vec2 h = uHalf;
+    float m = 0.0, L = uLen;
+    vec2 c;
+    c = vec2( h.x,  h.y);
+    m = max(m, seg(vPos, c, c - vec2(L, 0.0), uThick)); m = max(m, seg(vPos, c, c - vec2(0.0, L), uThick));
+    c = vec2(-h.x,  h.y);
+    m = max(m, seg(vPos, c, c + vec2(L, 0.0), uThick)); m = max(m, seg(vPos, c, c - vec2(0.0, L), uThick));
+    c = vec2( h.x, -h.y);
+    m = max(m, seg(vPos, c, c - vec2(L, 0.0), uThick)); m = max(m, seg(vPos, c, c + vec2(0.0, L), uThick));
+    c = vec2(-h.x, -h.y);
+    m = max(m, seg(vPos, c, c + vec2(L, 0.0), uThick)); m = max(m, seg(vPos, c, c + vec2(0.0, L), uThick));
+
+    float inX = step(abs(vPos.x), h.x), inY = step(abs(vPos.y), h.y);
+    float dx = abs(abs(vPos.x) - h.x), dy = abs(abs(vPos.y) - h.y);
+    m = max(m, max(smoothstep(uThick, 0.0, dx) * inY,
+                   smoothstep(uThick, 0.0, dy) * inX) * uFull);
+
+    float a = clamp(m + inX * inY * 0.20 * uFlash, 0.0, 1.0);
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(uCyan, a * uAlpha);
   }
 `;
 
@@ -374,6 +497,7 @@ export function createStory(canvas) {
   const paperMat = new ShaderMaterial({
     vertexShader: PAPER_VERT, fragmentShader: PAPER_FRAG, transparent: true,
     uniforms: { uCrumple: { value: 1 }, uScan: { value: -1 }, uFade: { value: 1 },
+                uReveal: { value: 0 }, uTex: { value: makeReceiptTexture() },
                 uInk: { value: INK }, uCyan: { value: CYAN } },
   });
   const paper = new Mesh(new PlaneGeometry(W, H, 48, 64), paperMat);
@@ -388,6 +512,19 @@ export function createStory(canvas) {
   crowd.renderOrder = -1;
   crowd.frustumCulled = false;
   scene.add(crowd);
+
+  const capMat = new ShaderMaterial({
+    vertexShader: CAP_VERT, fragmentShader: CAP_FRAG,
+    transparent: true, depthWrite: false,
+    uniforms: {
+      uHalf: { value: new Vector2(W * 0.9, H * 0.7) },
+      uAlpha: { value: 0 }, uThick: { value: 0.022 }, uLen: { value: 0.5 },
+      uFull: { value: 0 }, uFlash: { value: 0 }, uCyan: { value: CYAN },
+    },
+  });
+  const capture = new Mesh(new PlaneGeometry(W * 2.4, H * 1.5), capMat);
+  capture.position.z = 0.06;
+  scene.add(capture);
 
   const F = buildFormations();
   const geo = new BufferGeometry();
@@ -461,7 +598,7 @@ export function createStory(canvas) {
     // The receipt empties out once its numbers have lifted off, then comes
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
-    const gone = range(p, 0.46, 0.58);
+    const gone = range(p, 0.565, 0.655);
     const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
@@ -471,6 +608,20 @@ export function createStory(canvas) {
     paper.scale.set(sc, sc, 1);
     paper.position.y = -filed * 0.10;
 
+    // Edges found, locked, taken. This is what earns the switch to dark.
+    paperMat.uniforms.uReveal.value = range(p, 0.462, 0.512);
+    const lock = range(p, 0.395, 0.462);
+    const e = lock * lock * (3.0 - 2.0 * lock);
+    const tight = [W * 0.56, H * 0.53];
+    capMat.uniforms.uHalf.value.set(
+      tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.34));
+    capMat.uniforms.uLen.value = 0.58 - e * 0.28;
+    capMat.uniforms.uFull.value = range(p, 0.452, 0.474);
+    capMat.uniforms.uFlash.value =
+      range(p, 0.462, 0.474) * (1 - range(p, 0.474, 0.502));
+    capMat.uniforms.uAlpha.value =
+      range(p, 0.368, 0.398) * (1 - range(p, 0.495, 0.545));
+
     camera.position.y = -range(p, 0.6, 0.95) * 0.25;
   }
 
@@ -478,9 +629,10 @@ export function createStory(canvas) {
     resize, apply,
     render() { renderer.render(scene, camera); },
     dispose() {
-      paper.geometry.dispose(); paperMat.dispose();
+      paper.geometry.dispose(); paperMat.uniforms.uTex.value.dispose(); paperMat.dispose();
       geo.dispose(); dustMat.dispose();
       crowd.geometry.dispose(); crowdMat.dispose();
+      capture.geometry.dispose(); capMat.dispose();
       renderer.dispose();
     },
   };
