@@ -117,21 +117,6 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
   // The page starts on paper and turns dark at the capture, then stays
   // dark through the call to action and the footer.
-  // The donut is scrubbed by scroll like everything else in the story: each
-  // arc sweeps in turn rather than the whole ring appearing at once.
-  const donut = document.getElementById("odonut");
-  const seg = (v, a, b) => clamp01((v - a) / (b - a));
-  const paintDonut = (sp) => {
-    const on = sp > 0.652 && sp < 0.792;
-    donut.classList.toggle("is-on", on);
-    if (!on) return;
-    const t = seg(sp, 0.660, 0.760);
-    for (let i = 0; i < 4; i++) {
-      donut.style.setProperty(`--t${i + 1}`, seg(t, i * 0.19, i * 0.19 + 0.43).toFixed(3));
-    }
-  };
-  paintDonut(target);
-
   const paintTheme = (sp) =>
     document.body.classList.toggle("is-dark", sp > 0.472);
   paintTheme(target);
@@ -139,7 +124,6 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   addEventListener("scroll", () => {
     target = storyProgress();
     paintTheme(target);
-    paintDonut(target);
     paintBar(pageProgress());
     kick();
   }, { passive: true });

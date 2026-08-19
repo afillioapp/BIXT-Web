@@ -28,8 +28,12 @@
   --section-y: clamp(120px, 18vh, 220px);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
-@media (min-width: 641px)  { :root { --gutter: 40px; } }
-@media (min-width: 1025px) { :root { --gutter: 64px; } }
+@media (min-width: 641px)  {
+:root { --gutter: 40px; }
+}
+@media (min-width: 1025px) {
+:root { --gutter: 64px; }
+}
 
 /* The middle of the journey runs on the dark ground. Everything is token
    driven, so the whole page inverts by swapping the tokens; --cyan-deep has
@@ -45,17 +49,12 @@ body.is-dark {
 }
 body { transition: background-color 1200ms cubic-bezier(0.33, 0, 0.2, 1),
                     color 1200ms cubic-bezier(0.33, 0, 0.2, 1); }
-.pair__box, .cats__c, .donut__key i, .donut__seg, .path__seg, .ticks li,
-.eyebrow, .body, .body-lg, .caption, .headline, .display, .price, .stats__n {
-  transition: color 1200ms cubic-bezier(0.33, 0, 0.2, 1),
-              background-color 1200ms cubic-bezier(0.33, 0, 0.2, 1),
-              border-color 1200ms cubic-bezier(0.33, 0, 0.2, 1),
-              stroke 1200ms cubic-bezier(0.33, 0, 0.2, 1);
-}
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: reduce) {
+html { scroll-behavior: auto; }
+}
 
 body {
   margin: 0; background: var(--paper); color: var(--ink);
@@ -127,7 +126,6 @@ body {
 
 /* Each chapter fades up as it takes the stage. */
 
-
 .ch__hint {
   position: absolute; left: 50%; bottom: 21vh; translate: -50% 0;
   width: 3px; height: 68px; border-radius: 3px; overflow: hidden;
@@ -136,7 +134,9 @@ body {
 .ch__hint span { display: block; width: 100%; height: 42%; border-radius: 3px;
   background: var(--cyan); animation: hint 2.4s var(--ease) infinite; }
 @keyframes hint { 0% { transform: translateY(-100%); } 100% { transform: translateY(250%); } }
-@media (prefers-reduced-motion: reduce) { .ch__hint { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+.ch__hint { display: none; }
+}
 
 /* ---------- type ---------- */
 
@@ -187,7 +187,9 @@ body {
 .btn--solid:hover { transform: translateY(-2px); background: var(--cyan-btn-h); }
 .btn--ghost { color: var(--ink); border: 1px solid var(--rule); background: transparent; }
 .btn--ghost:hover { transform: translateY(-2px); border-color: var(--cyan); color: var(--cyan-deep); }
-@media (prefers-reduced-motion: reduce) { .btn:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+.btn:hover { transform: none; }
+}
 
 .ch--hero .display { font-size: clamp(2.125rem, 6.2vw, 4.75rem); }
 .hero__tag {
@@ -214,7 +216,9 @@ body {
 .nav__links a { color: var(--ink-soft); text-decoration: none; font-size: 0.9375rem;
   transition: color 200ms var(--ease); }
 .nav__links a:hover { color: var(--ink); }
-@media (max-width: 720px) { .nav__links { display: none; } .nav__in { gap: 16px; } }
+@media (max-width: 720px) {
+.nav__links { display: none; } .nav__in { gap: 16px; }
+}
 
 /* ---------- infographic pieces ---------- */
 
@@ -243,70 +247,20 @@ body {
   background: color-mix(in oklab, var(--cyan) 13%, transparent); }
 .cats__c.is-on span { filter: none; opacity: 1; }
 
-/* Spending chapter: copy on the left, the donut on the right. */
-.ch__text--split { display: grid; gap: 40px; align-items: center; }
-@media (min-width: 900px) { .ch__text--split { grid-template-columns: 1fr auto; gap: 72px; } }
-
-/* ---------- the donut, centred in the stage ---------- */
-
-.odonut {
-  --size: min(272px, 58vw);
-  position: fixed; left: 50%; top: 11svh; translate: -50% 0;
-  z-index: 1; margin: 0; width: var(--size);
-  opacity: 0; pointer-events: none;
-  transition: opacity 600ms var(--ease);
+@media (min-width: 900px) {
+.ch__text--split { grid-template-columns: 1fr auto; gap: 72px; }
 }
-.odonut.is-on { opacity: 1; }
-.odonut__ring { position: relative; }
-.odonut svg { width: 100%; height: auto; display: block; transform: rotate(-90deg); }
-
-.od__track { fill: none; stroke-width: 24;
-  stroke: color-mix(in oklab, var(--ink) 14%, transparent); }
-.od__seg { fill: none; stroke-width: 24; stroke-linecap: butt;
-  stroke-dasharray: calc(172 * 0) 502.65; }
-.od__seg--1 { stroke: var(--cyan);                stroke-dasharray: calc(172 * var(--t1, 0)) 502.65; stroke-dashoffset: 0; }
-.od__seg--2 { stroke: oklch(0.60 0.085 205);      stroke-dasharray: calc(147 * var(--t2, 0)) 502.65; stroke-dashoffset: -176; }
-.od__seg--3 { stroke: oklch(0.46 0.055 235);      stroke-dasharray: calc(97  * var(--t3, 0)) 502.65; stroke-dashoffset: -327; }
-.od__seg--4 { stroke: oklch(0.72 0.030 250);      stroke-dasharray: calc(71  * var(--t4, 0)) 502.65; stroke-dashoffset: -428; }
-
-.od__pct {
-  position: absolute; left: 50%; top: 50%;
-  font-size: 0.8125rem; font-weight: 700; letter-spacing: -0.01em;
-  color: var(--paper); white-space: nowrap;
-  transform: translate(-50%, -50%) rotate(var(--a))
-             translate(0, calc(var(--size) * -0.363)) rotate(calc(-1 * var(--a)));
-}
-.od__pct--4 { color: var(--ink); }
-
-.od__mid { position: absolute; inset: 0; display: grid; place-content: center;
-  text-align: center; gap: 3px; }
-.od__mid i { font-style: normal; font-size: 0.6875rem; color: var(--ink-faint); }
-.od__mid b { font-size: calc(var(--size) * 0.115); letter-spacing: -0.025em; color: var(--ink); }
-
-.od__key { list-style: none; margin: 22px 0 0; padding: 0;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
-  font-size: 0.8125rem; color: var(--ink-soft); }
-.od__key li { display: flex; align-items: center; gap: 7px; }
-.od__key i { width: 9px; height: 9px; border-radius: 3px; }
-.od__key .k1 { background: var(--cyan); }
-.od__key .k2 { background: oklch(0.60 0.085 205); }
-.od__key .k3 { background: oklch(0.46 0.055 235); }
-.od__key .k4 { background: oklch(0.72 0.030 250); }
 
 .ch__text--cta { display: grid; gap: 40px; align-items: start; }
 @media (min-width: 860px) {
-  .ch__text--cta { grid-template-columns: 1.05fr 1fr; gap: 88px; align-items: center; }
+.ch__text--cta { grid-template-columns: 1.05fr 1fr; gap: 88px; align-items: center; }
 }
 .cta__act { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
 .cta__act .body { max-width: 32ch; }
 .cta__act .btn { margin-top: 4px; }
 
-.donut { position: relative; margin: 0; width: min(260px, 62vw); justify-self: start; }
-
-/* Stacked on a phone this chapter is the tallest thing on the site, so it
-   starts higher and the donut comes down a size. */
 @media (max-width: 859px) {
-  /* Compacted so the CTA can share the one vertical start, instead of
+/* Compacted so the CTA can share the one vertical start, instead of
      being the single chapter that begins somewhere else. */
   /* Scoped to the chapter: the base .price and .ticks rules are declared
      later in this file, so an unscoped override here loses on source order. */
@@ -324,42 +278,10 @@ body {
   .btn--lg { padding: 15px 32px; }
 }
 
-@media (max-width: 899px) {
-  .donut { display: flex; align-items: center; gap: 18px; width: 100%; }
-  .donut svg { width: 132px; flex: none; }
-  .donut__seg { stroke-width: 21; }
-  .donut__mid { inset: 0 auto 0 0; width: 132px; }
-  .donut__mid b { font-size: 0.9375rem; }
-  .donut__key { margin: 0; grid-template-columns: 1fr; gap: 6px; font-size: 0.75rem; }
-}
-.donut svg { width: 100%; height: auto; transform: rotate(-90deg); display: block; }
-.donut__seg { fill: none; stroke-width: 26; stroke-linecap: butt;
-  stroke-dasharray: 0 502.65; transition: stroke-dasharray 900ms var(--ease); }
-.ch.is-on .donut__seg--1 { stroke-dasharray: 172 502.65; stroke-dashoffset: 0; }
-.ch.is-on .donut__seg--2 { stroke-dasharray: 147 502.65; stroke-dashoffset: -176; }
-.ch.is-on .donut__seg--3 { stroke-dasharray: 97 502.65; stroke-dashoffset: -327; }
-.ch.is-on .donut__seg--4 { stroke-dasharray: 71 502.65; stroke-dashoffset: -428; }
-.donut__seg--1 { stroke: var(--cyan); }
-.donut__seg--2 { stroke: oklch(0.52 0.075 210); }
-.donut__seg--3 { stroke: oklch(0.38 0.05 240); }
-.donut__seg--4 { stroke: oklch(0.66 0.03 250); }
-.donut__mid { position: absolute; inset: 0; display: grid; place-content: center;
-  text-align: center; gap: 2px; }
-.donut__mid span { font-size: 0.75rem; color: var(--ink-faint); }
-.donut__mid b { font-size: clamp(1.05rem, 2vw, 1.4rem); letter-spacing: -0.02em; }
-.donut__key { list-style: none; margin: 22px 0 0; padding: 0;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px;
-  font-size: 0.8125rem; color: var(--ink-soft); }
-.donut__key li { display: flex; align-items: center; gap: 7px; }
-.donut__key b { color: var(--ink); font-weight: 600; }
-.donut__key i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-.donut__key .k1 { background: var(--cyan); }
-.donut__key .k2 { background: oklch(0.52 0.075 210); }
-.donut__key .k3 { background: oklch(0.38 0.05 240); }
-.donut__key .k4 { background: oklch(0.66 0.03 250); }
-
 .pair { display: grid; gap: 12px; margin-top: 28px; max-width: 460px; }
-@media (min-width: 620px) { .pair { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 620px) {
+.pair { grid-template-columns: 1fr 1fr; }
+}
 .pair__box { display: block; padding: 14px 16px; border-radius: 12px;
   border: 1px solid var(--rule); background: var(--paper-pure);
   font-size: 0.8125rem; color: var(--ink-faint); line-height: 1.45; }
@@ -367,7 +289,9 @@ body {
   color: var(--cyan-deep); margin-bottom: 2px; }
 
 .stats { display: grid; gap: 32px; margin-top: 40px; }
-@media (min-width: 700px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 780px; } }
+@media (min-width: 700px) {
+.stats { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 780px; }
+}
 .stats > div { border-top: 1px solid var(--rule); padding-top: 18px; }
 .stats__n { display: block; font-size: clamp(2.5rem, 5vw, 3.75rem); font-weight: 600;
   letter-spacing: -0.04em; line-height: 1; color: var(--ink); }
@@ -430,7 +354,7 @@ body {
   transition-delay: calc(var(--d, 0) * 80ms); }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; }
+.reveal { opacity: 1; transform: none; }
   .reveal.is-in { transition: none; }
   .ch__text { transition: none; }
 }

@@ -13,7 +13,7 @@
 import {
   Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry, BufferGeometry,
   InstancedBufferGeometry, InstancedBufferAttribute, IcosahedronGeometry,
-  BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, CanvasTexture, SRGBColorSpace,
+  BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, Vector4, CanvasTexture, SRGBColorSpace,
 } from "three";
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -145,6 +145,7 @@ const CROWD_VERT = /* glsl */ `
   uniform float uCull, uAlpha;
   varying float vA, vSeed, vShade, vRim;
   varying vec3 vN;
+  varying vec3 vView;
 
   float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
   float noise(vec3 p){
@@ -172,25 +173,31 @@ const CROWD_VERT = /* glsl */ `
     // Screw the sphere up: layered noise pushed along the normal, so the
     // silhouette itself goes lumpy the way a balled-up receipt does.
     vec3 n = normalize(position);
-    float d  = noise(n * 3.1 + aSeed * 41.0) - 0.5;
-          d += (noise(n * 6.7 + aSeed * 17.0) - 0.5) * 0.55;
-          d += (noise(n * 13.0 + aSeed * 7.0) - 0.5) * 0.22;
+    // Ridged noise: the abs() folds turn smooth lumps into creases, which is
+    // what separates crumpled paper from a blob.
+    float r1 = 1.0 - abs(noise(n * 2.7 + aSeed * 41.0) * 2.0 - 1.0);
+    float r2 = 1.0 - abs(noise(n * 5.9 + aSeed * 17.0) * 2.0 - 1.0);
+    float r3 = 1.0 - abs(noise(n * 11.3 + aSeed * 7.0) * 2.0 - 1.0);
+    float d = (r1 - 0.5) + (r2 - 0.5) * 0.55 + (r3 - 0.5) * 0.28;
     vShade = d;
 
-    vec3 p = n * (0.5 + d * 0.40) * aScale;
+    vec3 p = n * (0.5 + d * 0.52) * aScale;
     p = rot(aSpin) * p;
 
     // Creases facing the light catch it; the rim softens the edge.
     vec3 wn = normalize(rot(aSpin) * n);
     vN = wn;
     vRim = 1.0 - abs(wn.z);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p + aOffset, 1.0);
+    vec4 mv = modelViewMatrix * vec4(p + aOffset, 1.0);
+    vView = mv.xyz;
+    gl_Position = projectionMatrix * mv;
   }
 `;
 
 const CROWD_FRAG = /* glsl */ `
   varying float vA, vSeed, vShade, vRim;
   varying vec3 vN;
+  varying vec3 vView;
   void main() {
     if (vA < 0.01) discard;
 
@@ -198,11 +205,14 @@ const CROWD_FRAG = /* glsl */ `
     // light it properly: a key from upper left, creases darkened, and the
     // whole thing flattened the further back it sits.
     float soft = 0.30 + vSeed * 0.42;
+    // Facet normals from screen-space derivatives: paper folds are flat
+    // planes meeting at hard edges, not a smooth surface.
+    vec3 fn = normalize(cross(dFdx(vView), dFdy(vView)));
     vec3 L = normalize(vec3(-0.45, 0.72, 0.52));
-    float lam = clamp(dot(vN, L) * 0.5 + 0.5, 0.0, 1.0);
+    float lam = clamp(dot(fn, L) * 0.5 + 0.5, 0.0, 1.0);
     float crease = clamp(vShade, -0.5, 0.5);
 
-    float lit = 0.60 + 0.40 * lam - crease * 0.42;
+    float lit = 0.52 + 0.48 * lam - crease * 0.30;
     lit = mix(lit, 0.93, soft * 0.55);                 // distance washes it out
     vec3 col = vec3(0.99, 0.99, 1.0) * clamp(lit, 0.55, 1.02);
 
@@ -224,9 +234,12 @@ function buildCrowd() {
   const sed = new Float32Array(CROWD);
   const spin = new Float32Array(CROWD * 3);
   for (let i = 0; i < CROWD; i++) {
-    off[i * 3] = rnd(-5.4, 5.4);
-    off[i * 3 + 1] = rnd(-3.4, 3.4);
-    off[i * 3 + 2] = rnd(-5.4, -1.2);        // always behind the receipt
+    // Clustered at the centre rather than spread evenly: three samples
+    // averaged pulls the distribution toward the middle of the frame.
+    const bell = () => (Math.random() + Math.random() + Math.random()) / 3 - 0.5;
+    off[i * 3] = bell() * 8.6;
+    off[i * 3 + 1] = bell() * 5.6;
+    off[i * 3 + 2] = -2.2 + bell() * 5.2;    // always behind the receipt
     scl[i] = rnd(0.42, 0.98);
     sed[i] = Math.random();
     spin[i * 3] = rnd(0, 6.28);
@@ -280,65 +293,90 @@ const FOLDER_VERT = /* glsl */ `
   attribute vec3 aPos;
   attribute vec2 aSize;
   attribute float aKind;
+  attribute float aPhase;
+  uniform vec4 uPhaseA;
   varying vec2 vP;
   varying vec2 vHalf;
   varying float vKind;
+  varying float vOn;
   void main() {
     vHalf = aSize * 0.5;
     vP = position.xy * (aSize + 0.9);
     vKind = aKind;
+    // Each instance belongs to one beat; uPhaseA carries the three opacities.
+    vOn = aPhase < 0.5 ? uPhaseA.x
+        : aPhase < 1.5 ? uPhaseA.y
+        : aPhase < 2.5 ? uPhaseA.z : uPhaseA.w;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vec3(vP, 0.0) + aPos, 1.0);
   }
 `;
 
 const FOLDER_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform float uAlpha, uDraw, uThick;
+  uniform float uDraw, uThick;
   varying vec2 vP;
   varying vec2 vHalf;
   varying float vKind;
+  varying float vOn;
 
   float rrect(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
   }
-  float bar(vec2 p, vec2 c, vec2 h, float r) { return rrect(p - c, h, r); }
+  float seg(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a, ba = b - a;
+    return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+  }
 
   void main() {
-    if (uAlpha < 0.01) discard;
+    if (vOn < 0.01) discard;
+    vec2 h = vHalf;
 
-    // The outline draws itself clockwise from the top-left.
-    float ang = atan(vP.y - vHalf.y * 0.0, vP.x);
-    float sweep = clamp((3.14159 - ang) / 6.28318 + 0.25, 0.0, 1.0);
-    float drawn = step(sweep, uDraw + 0.02);
-
-    float d = abs(rrect(vP, vHalf, 0.10)) - uThick;
-    float body = smoothstep(0.012, 0.0, d) * drawn;
-
-    // The tab that makes it read as a folder.
-    float tabD = abs(bar(vP, vec2(-vHalf.x + 0.42, vHalf.y + 0.14), vec2(0.42, 0.14), 0.07)) - uThick;
-    float tab = smoothstep(0.012, 0.0, tabD) * step(0.18, uDraw);
-
-    // Contents: rows for the sheet, a document for the photos.
-    float inner = 0.0;
-    if (vKind < 0.5) {
-      for (int i = 0; i < 4; i++) {
-        float y = vHalf.y * 0.42 - float(i) * 0.28;
-        float w = vHalf.x * (0.62 - mod(float(i), 2.0) * 0.16);
-        inner += smoothstep(0.020, 0.0, abs(rrect(vP - vec2(-vHalf.x * 0.06, y), vec2(w, 0.022), 0.02)));
-      }
-    } else {
-      inner += smoothstep(0.014, 0.0, abs(rrect(vP - vec2(0.0, -0.02), vec2(0.34, 0.60), 0.05)) - 0.012);
-      for (int i = 0; i < 3; i++) {
-        float y = 0.30 - float(i) * 0.22;
-        inner += smoothstep(0.018, 0.0, abs(rrect(vP - vec2(0.0, y), vec2(0.20, 0.018), 0.02)));
-      }
+    // The link between the two surfaces is a solid rule, not a folder.
+    if (vKind > 2.5) {
+      float gh = h.y * (0.08 + 0.92 * clamp(uDraw * 1.3, 0.0, 1.0));
+      float d3 = rrect(vP - vec2(0.0, gh - h.y), vec2(h.x, gh), min(h.x, 0.07));
+      float core3 = smoothstep(0.012, 0.0, d3);
+      float glow3 = smoothstep(0.11, 0.0, d3);
+      float a3 = clamp(core3 + glow3 * 0.28, 0.0, 1.0) * vOn;
+      if (a3 < 0.004) discard;
+      gl_FragColor = vec4(uCyan * (1.15 + core3 * 0.9), a3);
+      return;
     }
-    inner *= smoothstep(0.35, 0.75, uDraw);
 
-    float a = clamp(max(max(body, tab), inner * 0.85), 0.0, 1.0) * uAlpha;
+    if (vKind > 1.5) {
+      float solid = smoothstep(0.012, 0.0, rrect(vP, h, h.y)) * step(0.30, uDraw);
+      if (solid < 0.01) discard;
+      gl_FragColor = vec4(uCyan * 1.6, solid * vOn);
+      return;
+    }
+
+    // A real folder silhouette: back plate, tab, and the angled front flap.
+    float d = abs(rrect(vP, vec2(h.x, h.y * 0.86), 0.10));
+
+    float tab = abs(rrect(vP - vec2(-h.x + h.x * 0.42, h.y * 0.86 + h.y * 0.11),
+                          vec2(h.x * 0.42, h.y * 0.11), 0.06));
+    d = min(d, max(tab, -0.001));
+
+    // Front flap: its top edge rises to the right, the way a folder sits open.
+    float flap = seg(vP, vec2(-h.x, h.y * 0.18), vec2(h.x, h.y * 0.54));
+    d = min(d, flap);
+
+    // A couple of lines of contents, low and left.
+    for (int i = 0; i < 2; i++) {
+      float y = -h.y * (0.18 + float(i) * 0.24);
+      d = min(d, seg(vP, vec2(-h.x * 0.62, y), vec2(-h.x * (0.16 - float(i) * 0.12), y)));
+    }
+
+    // Draws itself left to right.
+    float reveal = step((vP.x + h.x) / (2.0 * h.x), uDraw + 0.02);
+
+    // Neon: a bright core inside a soft halo.
+    float core = smoothstep(uThick, 0.0, d);
+    float glow = smoothstep(uThick * 9.0, 0.0, d);
+    float a = clamp(core + glow * 0.42, 0.0, 1.0) * vOn * reveal;
     if (a < 0.004) discard;
-    gl_FragColor = vec4(uCyan, a);
+    gl_FragColor = vec4(uCyan * (1.25 + core * 1.15), a);
   }
 `;
 
@@ -348,12 +386,36 @@ function buildFolders() {
   g.index = base.index;
   g.attributes.position = base.attributes.position;
   g.attributes.uv = base.attributes.uv;
-  g.instanceCount = 2;
-  g.setAttribute("aPos", new InstancedBufferAttribute(
-    new Float32Array([-1.95, 0.15, 0.05,  1.95, 0.15, 0.05]), 3));
-  g.setAttribute("aSize", new InstancedBufferAttribute(
-    new Float32Array([2.60, 1.90,  2.60, 1.90]), 2));
-  g.setAttribute("aKind", new InstancedBufferAttribute(new Float32Array([0, 1]), 1));
+
+  //            x      y     w     h    kind  phase
+  const inst = [
+    [-1.95,  0.15,  2.60, 1.90,  0,  0],   // 06  expenses
+    [ 1.95,  0.15,  2.60, 1.90,  1,  0],   // 06  supporting documents
+    [-2.15,  0.15,  2.30, 1.70,  0,  1],   // 08  yours
+    [ 2.15,  0.15,  2.30, 1.70,  0,  1],   // 08  your accountant's, same folder
+    [ 0.00,  0.15,  1.70, 0.075, 2,  1],   // 08  the link between them
+    [ 0.00,  0.15,  2.60, 1.90,  1,  2],   // 09  stored
+    // 07  the dashboard, in the same neon line language
+    [-2.55, -0.90,  0.30, 0.62,  3,  3],
+    [-1.70, -0.90,  0.30, 1.18,  3,  3],
+    [-0.85, -0.90,  0.30, 0.86,  3,  3],
+    [+0.00, -0.90,  0.30, 1.72,  3,  3],
+    [+0.85, -0.90,  0.30, 1.30,  3,  3],
+    [+1.70, -0.90,  0.30, 2.05,  3,  3],
+    [+2.55, -0.90,  0.30, 1.52,  3,  3],
+  ];
+  g.instanceCount = inst.length;
+  const pos = new Float32Array(inst.length * 3), size = new Float32Array(inst.length * 2);
+  const kind = new Float32Array(inst.length), phase = new Float32Array(inst.length);
+  inst.forEach((r, i) => {
+    pos[i * 3] = r[0]; pos[i * 3 + 1] = r[1]; pos[i * 3 + 2] = 0.05;
+    size[i * 2] = r[2]; size[i * 2 + 1] = r[3];
+    kind[i] = r[4]; phase[i] = r[5];
+  });
+  g.setAttribute("aPos", new InstancedBufferAttribute(pos, 3));
+  g.setAttribute("aSize", new InstancedBufferAttribute(size, 2));
+  g.setAttribute("aKind", new InstancedBufferAttribute(kind, 1));
+  g.setAttribute("aPhase", new InstancedBufferAttribute(phase, 1));
   return g;
 }
 
@@ -417,7 +479,7 @@ const SHEET_FRAG = /* glsl */ `
   uniform vec3 uCyan;
   varying vec2 vUv;
   void main() {
-    if (uAlpha < 0.01) discard;
+    if (vOn < 0.01) discard;
     // The sheet writes itself left to right as the data lands in it.
     float front = uWipeIn;
     float on = smoothstep(front + 0.05, front - 0.02, vUv.x);
@@ -631,6 +693,7 @@ export function createStory(canvas) {
   camera.position.set(0, 0, 9.3);
 
   const paperMat = new ShaderMaterial({
+    name: "paper",
     vertexShader: PAPER_VERT, fragmentShader: PAPER_FRAG, transparent: true,
     uniforms: { uCrumple: { value: 1 }, uScan: { value: -1 }, uFade: { value: 1 },
                 uShutter: { value: 0 }, uExtract: { value: 0 },
@@ -641,6 +704,7 @@ export function createStory(canvas) {
   scene.add(paper);
 
   const crowdMat = new ShaderMaterial({
+    name: "crowd",
     vertexShader: CROWD_VERT, fragmentShader: CROWD_FRAG,
     transparent: true, depthWrite: false,
     uniforms: { uCull: { value: 0 }, uAlpha: { value: 0 }, uInk: { value: INK } },
@@ -651,6 +715,7 @@ export function createStory(canvas) {
   scene.add(crowd);
 
   const capMat = new ShaderMaterial({
+    name: "capture",
     vertexShader: CAP_VERT, fragmentShader: CAP_FRAG,
     transparent: true, depthWrite: false,
     uniforms: {
@@ -664,16 +729,18 @@ export function createStory(canvas) {
   scene.add(capture);
 
   const folderMat = new ShaderMaterial({
+    name: "folders",
     vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
-    transparent: true, depthWrite: false,
-    uniforms: { uCyan: { value: CYAN }, uAlpha: { value: 0 },
-                uDraw: { value: 0 }, uThick: { value: 0.012 } },
+    transparent: true, depthWrite: false, blending: AdditiveBlending,
+    uniforms: { uCyan: { value: CYAN }, uPhaseA: { value: new Vector4(0, 0, 0, 0) },
+                uDraw: { value: 0 }, uThick: { value: 0.016 } },
   });
   const folders = new Mesh(buildFolders(), folderMat);
   folders.frustumCulled = false;
   scene.add(folders);
 
   const sheetMat = new ShaderMaterial({
+    name: "sheet",
     vertexShader: SHEET_VERT, fragmentShader: SHEET_FRAG, transparent: true, depthWrite: false,
     uniforms: { uTex: { value: makeSheetTexture() }, uAlpha: { value: 0 },
                 uWipeIn: { value: 0 }, uCyan: { value: CYAN } },
@@ -692,6 +759,7 @@ export function createStory(canvas) {
   geo.setAttribute("aSeed", new BufferAttribute(seeds, 1));
 
   const dustMat = new ShaderMaterial({
+    name: "dust",
     vertexShader: DUST_VERT, fragmentShader: DUST_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
     uniforms: { uT: { value: 0 }, uSize: { value: 90 }, uAlpha: { value: 0 },
@@ -751,7 +819,7 @@ export function createStory(canvas) {
     // The bars are the chart for this stretch; the cloud would only fight it.
     const chartHold = range(p, 0.618, 0.652) * (1 - range(p, 0.772, 0.806));
     dustMat.uniforms.uAlpha.value =
-      range(p, 0.792, 0.836) * (1 - range(p, 0.945, 0.985) * 0.96);
+      0.0 * range(p, 0.792, 0.836) * (1 - range(p, 0.945, 0.985) * 0.96);
 
     paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
@@ -800,9 +868,23 @@ export function createStory(canvas) {
       range(p, 0.326, 0.356) * (1 - range(p, 0.470, 0.512));
 
     // Solid folder outlines draw themselves around the two destinations.
-    folderMat.uniforms.uAlpha.value = range(p, 0.566, 0.598) * (1 - range(p, 0.606, 0.642));
-    folderMat.uniforms.uDraw.value = ease(range(p, 0.570, 0.624));
-    folders.visible = folderMat.uniforms.uAlpha.value > 0.005;
+    // 06 the pair, 08 the hand-off, 09 the one it ends in.
+    const fA = range(p, 0.566, 0.598) * (1 - range(p, 0.606, 0.642));
+    const fB = range(p, 0.756, 0.792) * (1 - range(p, 0.856, 0.892));
+    const fC = range(p, 0.884, 0.918) * (1 - range(p, 0.958, 0.986));
+    const fD = range(p, 0.664, 0.698) * (1 - range(p, 0.736, 0.766));   // 07
+    folderMat.uniforms.uPhaseA.value.set(fA, fB, fC, fD);
+    folderMat.uniforms.uDraw.value =
+      p < 0.655 ? ease(range(p, 0.570, 0.624))
+               : p < 0.74 ? ease(range(p, 0.668, 0.722))
+               : p < 0.86 ? ease(range(p, 0.760, 0.818))
+                          : ease(range(p, 0.888, 0.936));
+    folders.visible = Math.max(Math.max(fA, fB), Math.max(fC, fD)) > 0.005;
+
+    // 10 the rows condense toward the ring rather than simply fading.
+    const toDash = ease(range(p, 0.606, 0.652));
+    sheet.position.x += toDash * (0 - sheet.position.x) * 0.9;
+    sheet.position.y += toDash * (1.15 - sheet.position.y) * 0.9;
 
     sheet.visible = settle > 0.001 && p < 0.65;
     sheetMat.uniforms.uAlpha.value = range(p, 0.548, 0.580) * (1 - range(p, 0.606, 0.642));

@@ -19,27 +19,6 @@
 <!-- The story canvas sits behind everything and is driven by page scroll. -->
 <div class="stage" id="stage" aria-hidden="true">
   <canvas class="stage__canvas" id="gl"></canvas>
-  <figure class="odonut" id="odonut" aria-label="Share of spending: fuel 35 percent, meals 30 percent, supplies 20 percent, tools 15 percent">
-    <div class="odonut__ring">
-      <svg viewBox="0 0 220 220" role="img" aria-hidden="true">
-        <circle class="od__track" cx="110" cy="110" r="80" />
-        <circle class="od__seg od__seg--1" cx="110" cy="110" r="80" />
-        <circle class="od__seg od__seg--2" cx="110" cy="110" r="80" />
-        <circle class="od__seg od__seg--3" cx="110" cy="110" r="80" />
-        <circle class="od__seg od__seg--4" cx="110" cy="110" r="80" />
-      </svg>
-      <span class="od__pct od__pct--1" style="--a:63deg">35%</span>
-      <span class="od__pct od__pct--2" style="--a:180deg">30%</span>
-      <span class="od__pct od__pct--3" style="--a:270deg">20%</span>
-      <span class="od__pct od__pct--4" style="--a:333deg">15%</span>
-      <span class="od__mid"><i>This month</i><b>$3,532.43</b></span>
-    </div>
-    <ul class="od__key">
-      <li><i class="k1"></i>Fuel</li><li><i class="k2"></i>Meals</li>
-      <li><i class="k3"></i>Supplies</li><li><i class="k4"></i>Tools</li>
-    </ul>
-  </figure>
-
   <div class="stage__poster" id="poster" hidden>
     <div class="poster__receipt">
       <div class="poster__line poster__line--head"></div>
