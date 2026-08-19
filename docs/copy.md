@@ -1,7 +1,19 @@
 # BX — website copy
 
+## The name
+
+**BX** is the logotype only. Said aloud it runs together as "Bixt", and that
+is the name in prose: *Bixt reads it*, *Get Bixt*, *Just Bixt it*, *© Bixt*.
+
+Three places keep the letters BX and must not be "corrected":
+- the wordmark in the nav
+- the favicon glyph
+- the Drive folder chip, `BX - Northside Landscaping`, because the app really
+  does name the folder with that prefix
+
 ## Voice guide
 
+- **Never write BX in a sentence.** It is a mark, not a word. Write Bixt.
 - **Real nouns only.** Receipt, folder, spreadsheet, your accountant, April. Never "solution", "platform", "seamless", "effortless", "AI-powered", "streamline", "empower", "unlock".
 - **The outcome is the hero, not the technology.** Claude reads the receipt — say it plainly, once, and move on. What the reader cares about is that the shoebox is gone and their accountant stopped chasing them.
 - **One idea per section, short declarative sentences.** If a line needs a comma splice to hold two thoughts, it is two lines. Hero headline stays under eight words.
