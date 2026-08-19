@@ -133,7 +133,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   paintDonut(target);
 
   const paintTheme = (sp) =>
-    document.body.classList.toggle("is-dark", sp > 0.445);
+    document.body.classList.toggle("is-dark", sp > 0.472);
   paintTheme(target);
 
   addEventListener("scroll", () => {
