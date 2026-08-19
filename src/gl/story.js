@@ -476,8 +476,8 @@ function buildFormations() {
 
 /* Chapter keyframes across global page scroll. */
 const KEYS = [
-  [0.00, "ink"],       [0.44, "ink"],   [0.555, "twoFolders"],
-  [0.665, "dashboard"], [0.775, "share"], [0.885, "folder"], [1.00, "folder"],
+  [0.00, "ink"],        [0.50, "ink"],    [0.60, "twoFolders"],
+  [0.70, "dashboard"],  [0.79, "share"],  [0.89, "folder"], [1.00, "folder"],
 ];
 
 export function createStory(canvas) {
@@ -592,13 +592,13 @@ export function createStory(canvas) {
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
     paper.rotation.y = (1 - range(p, 0.04, 0.32)) * -0.45;
 
-    const scan = range(p, 0.32, 0.46);
-    paperMat.uniforms.uScan.value = p >= 0.32 && p <= 0.48 ? scan : -1;
+    const scan = range(p, 0.29, 0.41);
+    paperMat.uniforms.uScan.value = p >= 0.29 && p <= 0.43 ? scan : -1;
 
     // The receipt empties out once its numbers have lifted off, then comes
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
-    const gone = range(p, 0.565, 0.655);
+    const gone = range(p, 0.545, 0.635);
     const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
@@ -609,20 +609,20 @@ export function createStory(canvas) {
     paper.position.y = -filed * 0.10;
 
     // Edges found, locked, taken. This is what earns the switch to dark.
-    paperMat.uniforms.uReveal.value = range(p, 0.462, 0.512);
-    const lock = range(p, 0.395, 0.462);
+    paperMat.uniforms.uReveal.value = range(p, 0.425, 0.470);
+    const lock = range(p, 0.355, 0.425);
     const e = lock * lock * (3.0 - 2.0 * lock);
     const tight = [W * 0.56, H * 0.53];
     capMat.uniforms.uHalf.value.set(
       tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.34));
     capMat.uniforms.uLen.value = 0.58 - e * 0.28;
-    capMat.uniforms.uFull.value = range(p, 0.452, 0.474);
+    capMat.uniforms.uFull.value = range(p, 0.415, 0.437);
     capMat.uniforms.uFlash.value =
-      range(p, 0.462, 0.474) * (1 - range(p, 0.474, 0.502));
+      range(p, 0.425, 0.437) * (1 - range(p, 0.437, 0.465));
     capMat.uniforms.uAlpha.value =
-      range(p, 0.368, 0.398) * (1 - range(p, 0.495, 0.545));
+      range(p, 0.330, 0.360) * (1 - range(p, 0.455, 0.505));
 
-    camera.position.y = -range(p, 0.6, 0.95) * 0.25;
+    camera.position.y = -0.85 - range(p, 0.6, 0.95) * 0.25;
   }
 
   return {

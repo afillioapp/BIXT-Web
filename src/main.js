@@ -26,7 +26,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   } else {
     const io = new IntersectionObserver((es) => {
       for (const e of es) e.target.classList.toggle("is-on", e.isIntersecting);
-    }, { rootMargin: "-28% 0px -28% 0px" });
+    }, { rootMargin: "-50% 0px -50% 0px" });
     chapters.forEach((c) => io.observe(c));
   }
   // The hero is already on screen at load; don't make it wait for a scroll.
@@ -118,7 +118,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   // Chapters 05 to 07 run dark, then the page returns to paper for the
   // call to action.
   const paintTheme = (sp) =>
-    document.body.classList.toggle("is-dark", sp > 0.497 && sp < 0.855);
+    document.body.classList.toggle("is-dark", sp > 0.445 && sp < 0.845);
   paintTheme(target);
 
   addEventListener("scroll", () => {

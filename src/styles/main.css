@@ -87,7 +87,7 @@ body {
 
 /* ---------- chapters ---------- */
 
-.ch { position: relative; z-index: 1; min-height: 185svh; padding-inline: var(--gutter); }
+.ch { position: relative; z-index: 1; min-height: 165svh; padding-inline: var(--gutter); }
 .ch--hero, .ch--cta { min-height: 100svh; display: grid; align-items: center; }
 
 /* The words pin for the length of their chapter, so the text you are reading
@@ -95,13 +95,16 @@ body {
    off the top while its scene is still playing. */
 .ch__text {
   position: fixed; z-index: 2;
-  left: 0; right: 0; top: 46svh; bottom: auto;
+  left: 0; right: 0; top: 56svh; bottom: auto;
   width: 100%; max-width: 1080px; margin-inline: auto;
   padding-inline: var(--gutter);
   opacity: 0; pointer-events: none;
-  transition: opacity 600ms var(--ease);
+  transition: opacity 420ms var(--ease);
 }
-.ch.is-on .ch__text { opacity: 1; pointer-events: auto; }
+.ch.is-on .ch__text {
+  opacity: 1; pointer-events: auto;
+  transition: opacity 620ms var(--ease) 380ms;
+}
 .ch--hero .ch__text, .ch--cta .ch__text {
   position: static; opacity: 1; pointer-events: auto; padding-inline: 0;
 }
@@ -113,7 +116,7 @@ body {
 
 
 .ch__hint {
-  position: absolute; left: 50%; bottom: 13vh; translate: -50% 0;
+  position: absolute; left: 50%; bottom: 21vh; translate: -50% 0;
   width: 3px; height: 68px; border-radius: 3px; overflow: hidden;
   background: color-mix(in oklab, var(--ink) 14%, transparent);
 }
@@ -177,7 +180,7 @@ body {
 .hero__tag {
   margin: 0; font-weight: 500; color: var(--ink-soft);
   font-size: clamp(1.0625rem, 1.8vw, 1.5rem); line-height: 1.35;
-  letter-spacing: -0.015em; max-width: 36ch;
+  letter-spacing: -0.015em; max-width: 52ch;
 }
 .hero__tag .hl { font-weight: 700; }
 
@@ -215,6 +218,59 @@ body {
 .path__seg--lit { background: color-mix(in oklab, var(--cyan) 14%, var(--paper-pure));
   border-color: color-mix(in oklab, var(--cyan) 45%, transparent); color: var(--cyan-deep); font-weight: 600; }
 .path__sep { color: var(--ink-faint); }
+
+/* Categories: the recognised one lights up, the rest stay quiet. */
+.cats { list-style: none; display: flex; flex-wrap: wrap; gap: 9px; margin: 28px 0 0; padding: 0; }
+.cats__c { display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px; border-radius: 999px; font-size: 0.875rem; font-weight: 500;
+  border: 1px solid var(--rule); color: var(--ink-faint);
+  transition: color 400ms var(--ease), border-color 400ms var(--ease),
+              background-color 400ms var(--ease); }
+.cats__c span { font-size: 1rem; filter: grayscale(1); opacity: 0.5; transition: filter 400ms, opacity 400ms; }
+.cats__c.is-on { color: var(--cyan-deep); font-weight: 600;
+  border-color: color-mix(in oklab, var(--cyan) 55%, transparent);
+  background: color-mix(in oklab, var(--cyan) 13%, transparent); }
+.cats__c.is-on span { filter: none; opacity: 1; }
+
+/* Spending chapter: copy on the left, the donut on the right. */
+.ch__text--split { display: grid; gap: 40px; align-items: center; }
+@media (min-width: 900px) { .ch__text--split { grid-template-columns: 1fr auto; gap: 72px; } }
+
+.donut { position: relative; margin: 0; width: min(260px, 62vw); justify-self: start; }
+
+/* Stacked on a phone this chapter is the tallest thing on the site, so it
+   starts higher and the donut comes down a size. */
+@media (max-width: 899px) {
+  .ch__text--split { top: 32svh; }
+  .donut { width: min(196px, 50vw); }
+  .donut__seg { stroke-width: 22; }
+  .donut__key { margin-top: 16px; font-size: 0.75rem; gap: 6px 12px; }
+}
+.donut svg { width: 100%; height: auto; transform: rotate(-90deg); display: block; }
+.donut__seg { fill: none; stroke-width: 26; stroke-linecap: butt;
+  stroke-dasharray: 0 502.65; transition: stroke-dasharray 900ms var(--ease); }
+.ch.is-on .donut__seg--1 { stroke-dasharray: 172 502.65; stroke-dashoffset: 0; }
+.ch.is-on .donut__seg--2 { stroke-dasharray: 147 502.65; stroke-dashoffset: -176; }
+.ch.is-on .donut__seg--3 { stroke-dasharray: 97 502.65; stroke-dashoffset: -327; }
+.ch.is-on .donut__seg--4 { stroke-dasharray: 71 502.65; stroke-dashoffset: -428; }
+.donut__seg--1 { stroke: var(--cyan); }
+.donut__seg--2 { stroke: oklch(0.52 0.075 210); }
+.donut__seg--3 { stroke: oklch(0.38 0.05 240); }
+.donut__seg--4 { stroke: oklch(0.66 0.03 250); }
+.donut__mid { position: absolute; inset: 0; display: grid; place-content: center;
+  text-align: center; gap: 2px; }
+.donut__mid span { font-size: 0.75rem; color: var(--ink-faint); }
+.donut__mid b { font-size: clamp(1.05rem, 2vw, 1.4rem); letter-spacing: -0.02em; }
+.donut__key { list-style: none; margin: 22px 0 0; padding: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px;
+  font-size: 0.8125rem; color: var(--ink-soft); }
+.donut__key li { display: flex; align-items: center; gap: 7px; }
+.donut__key b { color: var(--ink); font-weight: 600; }
+.donut__key i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.donut__key .k1 { background: var(--cyan); }
+.donut__key .k2 { background: oklch(0.52 0.075 210); }
+.donut__key .k3 { background: oklch(0.38 0.05 240); }
+.donut__key .k4 { background: oklch(0.66 0.03 250); }
 
 .pair { display: grid; gap: 12px; margin-top: 28px; max-width: 460px; }
 @media (min-width: 620px) { .pair { grid-template-columns: 1fr 1fr; } }
