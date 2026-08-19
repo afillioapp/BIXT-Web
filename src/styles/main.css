@@ -99,7 +99,8 @@ body {
 /* ---------- chapters ---------- */
 
 .ch { position: relative; z-index: 1; min-height: 205svh; padding-inline: var(--gutter); }
-.ch--hero { min-height: 100svh; display: grid; align-items: center; }
+.ch--hero { min-height: 100svh; display: grid; align-items: center;
+  padding-bottom: clamp(48px, 10vh, 120px); }
 .ch--cta { min-height: 205svh; }
 
 /* The words pin for the length of their chapter, so the text you are reading
@@ -119,9 +120,42 @@ body {
 }
 .ch--hero .ch__text {
   position: static; opacity: 1; pointer-events: auto; padding-inline: 0;
+  max-width: none; margin-inline: 0;
 }
-.ch__text--center { align-items: center; }
-.ch__text--center { text-align: center; }
+
+/* Words left, phone right. The padding-bottom lifts the pair off the optical
+   centre, which reads as centred once the nav is accounted for. */
+.hero {
+  width: 100%; max-width: 1080px; margin-inline: auto;
+  display: grid; gap: clamp(30px, 4vw, 64px); align-items: center;
+}
+@media (min-width: 900px) {
+.hero { grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr); }
+}
+
+.hero__phone { justify-self: center; width: min(252px, 58vw); }
+@media (min-width: 900px) {
+.hero__phone { justify-self: end; width: min(286px, 27vw); }
+}
+
+/* The device is drawn rather than shipped as a PNG, so it inherits the page's
+   own shadow language instead of a stock mockup's. */
+.phone {
+  position: relative; border-radius: 46px; padding: 9px;
+  background: linear-gradient(158deg,
+    oklch(0.40 0.018 264), oklch(0.17 0.028 264) 44%, oklch(0.31 0.02 264));
+  box-shadow:
+    0 0 0 1px oklch(0.22 0.04 264 / 0.30),
+    0 44px 92px -34px oklch(0.22 0.04 264 / 0.52),
+    0 12px 32px -20px oklch(0.22 0.04 264 / 0.42);
+}
+.phone__shot { display: block; width: 100%; height: auto; border-radius: 38px; }
+/* The dynamic island, over the dead centre of the status bar. */
+.phone::after {
+  content: ""; position: absolute; top: 20px; left: 50%; translate: -50% 0;
+  width: 31%; height: 21px; border-radius: 999px;
+  background: oklch(0.11 0.02 264);
+}
 .ch__text--hero > * + * { margin-top: clamp(20px, 3.4vh, 44px); }
 
 /* Each chapter fades up as it takes the stage. */
@@ -146,9 +180,6 @@ body {
 
 .headline { margin: 0; font-size: clamp(1.5rem, 4.5vw, 3.5rem);
   font-weight: 600; letter-spacing: -0.028em; line-height: 1.06; text-wrap: balance; }
-
-.body-lg { font-size: clamp(1.0625rem, 1.5vw, 1.3125rem); letter-spacing: -0.01em;
-  line-height: 1.55; color: var(--ink-soft); }
 .body { color: var(--ink-soft); margin: 0; }
 
 .eyebrow { margin: 0 0 20px; font-size: 0.8125rem; font-weight: 600;
@@ -163,7 +194,6 @@ body {
 
 .measure { max-width: 30ch; }
 .measure--center { margin-inline: auto; }
-.measure-tight { max-width: 20ch; }
 .headline + .body, .display + .body { margin-top: 20px; }
 
 /* ---------- buttons ---------- */
@@ -212,36 +242,8 @@ body {
 .nav__links { display: none; } .nav__in { gap: 16px; }
 }
 
-/* ---------- infographic pieces ---------- */
-
-.chips { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0 0; padding: 0; }
-.chips li { padding: 8px 16px; border-radius: 999px; font-size: 0.875rem; font-weight: 500;
-  background: color-mix(in oklab, var(--cyan) 12%, transparent);
-  border: 1px solid color-mix(in oklab, var(--cyan) 32%, transparent); color: var(--cyan-deep); }
-
-.path { margin: 28px 0 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: clamp(0.75rem, 1.3vw, 0.9375rem); }
-.path__seg { padding: 8px 13px; border-radius: 8px; background: var(--paper-pure);
-  border: 1px solid var(--rule); color: var(--ink-soft); }
-.path__seg--lit { background: color-mix(in oklab, var(--cyan) 14%, var(--paper-pure));
-  border-color: color-mix(in oklab, var(--cyan) 45%, transparent); color: var(--cyan-deep); font-weight: 600; }
-.path__sep { color: var(--ink-faint); }
-
 /* Categories: the recognised one lights up, the rest stay quiet. */
 .cats { list-style: none; display: flex; flex-wrap: wrap; gap: 9px; margin: 28px 0 0; padding: 0; }
-.cats__c { display: inline-flex; align-items: center; gap: 8px;
-  padding: 9px 15px; border-radius: 999px; font-size: 0.875rem; font-weight: 500;
-  border: 1px solid var(--rule); color: var(--ink-faint); }
-.cats__c span { font-size: 1rem; filter: grayscale(1); opacity: 0.5; transition: filter 400ms, opacity 400ms; }
-.cats__c.is-on { color: var(--cyan-deep); font-weight: 600;
-  border-color: color-mix(in oklab, var(--cyan) 55%, transparent);
-  background: color-mix(in oklab, var(--cyan) 13%, transparent); }
-.cats__c.is-on span { filter: none; opacity: 1; }
-
-@media (min-width: 900px) {
-.ch__text--split { grid-template-columns: 1fr auto; gap: 72px; }
-}
 
 .ch__text--cta { text-align: center; align-items: center; display: flex;
   flex-direction: column; gap: 15px; }
@@ -250,8 +252,6 @@ body {
 .ch__text--cta .measure { max-width: 44ch; }
 .ch__text--cta .btn { margin-top: 6px; }
 
-.cta__act .btn { margin-top: 4px; }
-
 @media (max-width: 859px) {
   .ch__text { top: 57svh; }
 /* Compacted so the CTA can share the one vertical start, instead of
@@ -259,56 +259,9 @@ body {
   /* Scoped to the chapter: the base .price and .ticks rules are declared
      later in this file, so an unscoped override here loses on source order. */
   .ch--cta .price { margin: 8px 0 12px; font-size: clamp(2.25rem, 13.5vw, 3.25rem); }
-  .ch--cta .ticks { gap: 6px; font-size: 0.8125rem;
-    display: grid; grid-template-columns: 1fr 1fr; }
-  .ch--cta .ticks li { padding-left: 24px; font-size: 0.8125rem; line-height: 1.4; }
-  .ch--cta .ticks li::before { left: 2px; width: 9px; height: 5px; }
   .ch__text--cta { gap: 12px; }
-  .cta__act { gap: 10px; }
-  .ticks li { line-height: 1.4; }
-  .cta__act .body { display: none; }
-  .cta__act .caption { display: none; }
-  .cta__act .display--sm { font-size: clamp(1.5rem, 6vw, 2rem); }
   .btn--lg { padding: 15px 32px; }
 }
-
-.pair { display: grid; gap: 12px; margin-top: 28px; max-width: 460px; }
-@media (min-width: 620px) {
-.pair { grid-template-columns: 1fr 1fr; }
-}
-.pair__box { display: block; padding: 14px 16px; border-radius: 12px;
-  border: 1px solid var(--rule); background: var(--paper-pure);
-  font-size: 0.8125rem; color: var(--ink-faint); line-height: 1.45; }
-.pair__box b { display: block; font-size: 0.9375rem; font-weight: 600;
-  color: var(--cyan-deep); margin-bottom: 2px; }
-
-.stats { display: grid; gap: 32px; margin-top: 40px; }
-@media (min-width: 700px) {
-.stats { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 780px; }
-}
-.stats > div { border-top: 1px solid var(--rule); padding-top: 18px; }
-.stats__n { display: block; font-size: clamp(2.5rem, 5vw, 3.75rem); font-weight: 600;
-  letter-spacing: -0.04em; line-height: 1; color: var(--ink); }
-.stats__l { display: block; margin-top: 10px; font-size: 0.9375rem; color: var(--ink-soft); }
-
-.nodes { display: flex; align-items: center; justify-content: center; gap: 0; margin-top: 44px; }
-.nodes__end { padding: 10px 20px; border-radius: 999px; font-size: 0.875rem; font-weight: 600;
-  background: var(--paper-pure); border: 1px solid var(--rule); white-space: nowrap; }
-.nodes__link { width: clamp(48px, 12vw, 140px); height: 2px; background:
-  linear-gradient(to right, var(--rule), var(--cyan), var(--rule)); }
-
-.price { margin: 28px 0 32px; font-size: clamp(4rem, 12vw, 8rem); font-weight: 600;
-  letter-spacing: -0.05em; line-height: 1; }
-.price__cur { font-size: 0.42em; vertical-align: super; margin-right: 6px; letter-spacing: normal; }
-.price__per { font-size: 0.17em; font-weight: 500; color: var(--ink-faint);
-  margin-left: 10px; letter-spacing: normal; }
-
-.ticks { list-style: none; margin: 0; padding: 0; max-width: 380px;
-  text-align: left; display: flex; flex-direction: column; gap: 13px; }
-.ticks li { position: relative; padding-left: 30px; color: var(--ink-soft); font-size: 0.9375rem; }
-.ticks li::before { content: ""; position: absolute; left: 4px; top: 0.5em;
-  width: 10px; height: 6px; border-left: 2px solid var(--cyan-deep);
-  border-bottom: 2px solid var(--cyan-deep); rotate: -45deg; }
 
 /* Runway after the last chapter so its copy has finished fading out before
    the footer scrolls up. Without it the two met mid-fade. */
