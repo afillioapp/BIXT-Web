@@ -84,14 +84,12 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
     caps.forEach((c, n) => c.classList.toggle("is-on", n === i));
   };
 
-  if (reduceMotion) {
-    // One frame, mid-story, then stop. No loop, no listeners.
-    scene.apply(0.5);
-    scene.render();
-    setCaption(0.5);
-    addEventListener("resize", () => { scene.resize(); scene.apply(0.5); scene.render(); }, { passive: true });
-    return;
-  }
+  // Reduced motion keeps the story — it is scrubbed 1:1 by the reader's own
+  // scrolling, not autoplayed — but loses the inertial easing, so nothing
+  // carries on moving after the finger stops. Rendering a single frozen frame
+  // here instead (the previous behaviour) just looked broken on any phone with
+  // iOS "Reduce Motion" switched on.
+  const EASE = reduceMotion ? 1 : 0.12;
 
   let target = progress();
   let current = target;
@@ -101,7 +99,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
   const loop = () => {
     if (!running) return;
     // Ease toward the scroll position so trackpad jitter doesn't show.
-    current += (target - current) * 0.12;
+    current += (target - current) * EASE;
     scene.apply(current);
     scene.render();
     if (Math.abs(target - current) > 0.0005) {
