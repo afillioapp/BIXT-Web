@@ -389,8 +389,8 @@ function buildFolders() {
 
   //            x      y     w     h    kind  phase
   const inst = [
-    [-1.95,  0.15,  2.60, 1.90,  0,  0],   // 06  expenses
-    [ 1.95,  0.15,  2.60, 1.90,  1,  0],   // 06  supporting documents
+    [-1.95,  0.30,  2.70, 1.95,  0,  0],   // 06  the sheet becomes this
+    [ 1.75, -0.26,  1.70, 2.20,  1,  0],   // 06  the receipt becomes this
     [-2.15,  0.15,  2.30, 1.70,  0,  1],   // 08  yours
     [ 2.15,  0.15,  2.30, 1.70,  0,  1],   // 08  your accountant's, same folder
     [ 0.00,  0.15,  1.70, 0.075, 2,  1],   // 08  the link between them
@@ -799,7 +799,7 @@ export function createStory(canvas) {
     const ease = (v) => v * v * (3 - 2 * v);
     // 07: the information separates. The receipt keeps the image and moves
     // aside; a second copy of it becomes the row in the sheet.
-    const settle = ease(range(p, 0.560, 0.660));
+    const settle = ease(range(p, 0.552, 0.606));
 
     let i = 0;
     while (i < KEYS.length - 2 && p >= KEYS[i + 1][0]) i++;
@@ -831,7 +831,7 @@ export function createStory(canvas) {
     // The receipt empties out once its numbers have lifted off, then comes
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
-    const gone = range(p, 0.604, 0.648);
+    const gone = range(p, 0.612, 0.654);
     const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
@@ -869,26 +869,26 @@ export function createStory(canvas) {
 
     // Solid folder outlines draw themselves around the two destinations.
     // 06 the pair, 08 the hand-off, 09 the one it ends in.
-    const fA = range(p, 0.566, 0.598) * (1 - range(p, 0.606, 0.642));
-    const fB = range(p, 0.756, 0.792) * (1 - range(p, 0.856, 0.892));
-    const fC = range(p, 0.884, 0.918) * (1 - range(p, 0.958, 0.986));
-    const fD = range(p, 0.664, 0.698) * (1 - range(p, 0.736, 0.766));   // 07
+    const fA = range(p, 0.612, 0.642) * (1 - range(p, 0.700, 0.730));
+    const fB = range(p, 0.844, 0.872) * (1 - range(p, 0.902, 0.928));
+    const fC = range(p, 0.936, 0.960) * (1 - range(p, 0.986, 0.999));
+    const fD = range(p, 0.748, 0.776) * (1 - range(p, 0.806, 0.832));   // 07
     folderMat.uniforms.uPhaseA.value.set(fA, fB, fC, fD);
     folderMat.uniforms.uDraw.value =
-      p < 0.655 ? ease(range(p, 0.570, 0.624))
-               : p < 0.74 ? ease(range(p, 0.668, 0.722))
-               : p < 0.86 ? ease(range(p, 0.760, 0.818))
-                          : ease(range(p, 0.888, 0.936));
+      p < 0.735 ? ease(range(p, 0.610, 0.664))
+               : p < 0.80 ? ease(range(p, 0.752, 0.800))
+               : p < 0.86 ? ease(range(p, 0.848, 0.896))
+                          : ease(range(p, 0.938, 0.972));
     folders.visible = Math.max(Math.max(fA, fB), Math.max(fC, fD)) > 0.005;
 
     // 10 the rows condense toward the ring rather than simply fading.
-    const toDash = ease(range(p, 0.606, 0.652));
+    const toDash = ease(range(p, 0.614, 0.656));
     sheet.position.x += toDash * (0 - sheet.position.x) * 0.9;
     sheet.position.y += toDash * (1.15 - sheet.position.y) * 0.9;
 
-    sheet.visible = settle > 0.001 && p < 0.65;
-    sheetMat.uniforms.uAlpha.value = range(p, 0.548, 0.580) * (1 - range(p, 0.606, 0.642));
-    sheetMat.uniforms.uWipeIn.value = ease(range(p, 0.556, 0.612));
+    sheet.visible = settle > 0.001 && p < 0.66;
+    sheetMat.uniforms.uAlpha.value = range(p, 0.544, 0.576) * (1 - range(p, 0.610, 0.652));
+    sheetMat.uniforms.uWipeIn.value = ease(range(p, 0.552, 0.600));
     sheet.position.set(-1.95 * settle, 0.30 * settle, -0.05);
     const ss = 0.30 + 0.70 * settle;
     sheet.scale.set(ss, ss, 1);

@@ -98,9 +98,9 @@ body {
 
 /* ---------- chapters ---------- */
 
-.ch { position: relative; z-index: 1; min-height: 165svh; padding-inline: var(--gutter); }
+.ch { position: relative; z-index: 1; min-height: 205svh; padding-inline: var(--gutter); }
 .ch--hero { min-height: 100svh; display: grid; align-items: center; }
-.ch--cta { min-height: 165svh; }
+.ch--cta { min-height: 205svh; }
 
 /* The words pin for the length of their chapter, so the text you are reading
    always belongs to the art you are looking at. Without this the copy scrolls
