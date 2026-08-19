@@ -16,8 +16,7 @@
   --paper:      oklch(0.97 0.005 260);
   --paper-pure: oklch(1 0 0);
   --rule:       oklch(0.90 0.008 260);
-  --footer-bg:  oklch(0.20 0.035 264);
-  --footer-fg:  oklch(0.97 0.005 260);
+  --footer-ink: oklch(0.20 0.035 264);   /* never inverts */
 
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter",
           system-ui, "Helvetica Neue", Arial, sans-serif;
@@ -98,7 +97,8 @@ body {
 /* ---------- chapters ---------- */
 
 .ch { position: relative; z-index: 1; min-height: 165svh; padding-inline: var(--gutter); }
-.ch--hero, .ch--cta { min-height: 100svh; display: grid; align-items: center; }
+.ch--hero { min-height: 100svh; display: grid; align-items: center; }
+.ch--cta { min-height: 165svh; }
 
 /* The words pin for the length of their chapter, so the text you are reading
    always belongs to the art you are looking at. Without this the copy scrolls
@@ -115,7 +115,7 @@ body {
   opacity: 1; pointer-events: auto;
   transition: opacity 620ms var(--ease) 380ms;
 }
-.ch--hero .ch__text, .ch--cta .ch__text {
+.ch--hero .ch__text {
   position: static; opacity: 1; pointer-events: auto; padding-inline: 0;
 }
 .ch__text--center { align-items: center; }
@@ -290,7 +290,7 @@ body {
 .od__key .k3 { background: oklch(0.46 0.055 235); }
 .od__key .k4 { background: oklch(0.72 0.030 250); }
 
-.ch__text--cta { display: grid; gap: 44px; align-items: center; }
+.ch__text--cta { display: grid; gap: 40px; align-items: start; }
 @media (min-width: 860px) {
   .ch__text--cta { grid-template-columns: 1.05fr 1fr; gap: 88px; align-items: center; }
 }
@@ -302,6 +302,25 @@ body {
 
 /* Stacked on a phone this chapter is the tallest thing on the site, so it
    starts higher and the donut comes down a size. */
+@media (max-width: 859px) {
+  /* Compacted so the CTA can share the one vertical start, instead of
+     being the single chapter that begins somewhere else. */
+  /* Scoped to the chapter: the base .price and .ticks rules are declared
+     later in this file, so an unscoped override here loses on source order. */
+  .ch--cta .price { margin: 8px 0 12px; font-size: clamp(2.25rem, 13.5vw, 3.25rem); }
+  .ch--cta .ticks { gap: 6px; font-size: 0.8125rem;
+    display: grid; grid-template-columns: 1fr 1fr; }
+  .ch--cta .ticks li { padding-left: 24px; font-size: 0.8125rem; line-height: 1.4; }
+  .ch--cta .ticks li::before { left: 2px; width: 9px; height: 5px; }
+  .ch__text--cta { gap: 12px; }
+  .cta__act { gap: 10px; }
+  .ticks li { line-height: 1.4; }
+  .cta__act .body { display: none; }
+  .cta__act .caption { display: none; }
+  .cta__act .display--sm { font-size: clamp(1.5rem, 6vw, 2rem); }
+  .btn--lg { padding: 15px 32px; }
+}
+
 @media (max-width: 899px) {
   .donut { display: flex; align-items: center; gap: 18px; width: 100%; }
   .donut svg { width: 132px; flex: none; }
@@ -374,13 +393,13 @@ body {
 
 .wrap { width: 100%; max-width: 1080px; margin-inline: auto; padding-inline: var(--gutter); }
 
-.footer { position: relative; z-index: 1; background: var(--cyan); color: var(--ink); }
+.footer { position: relative; z-index: 1; background: var(--cyan); color: var(--footer-ink); }
 .footer__in { max-width: 1080px; margin-inline: auto; padding: 22px var(--gutter);
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; }
 .footer__mark { font-weight: 700; font-size: 1rem; letter-spacing: -0.03em; }
 .footer__line { margin: 0; font-weight: 600; font-size: 0.9375rem; }
 .footer__nav { margin-left: auto; display: flex; gap: 20px; }
-.footer__nav a { color: var(--ink); text-decoration: none; font-size: 0.875rem; opacity: 0.82; }
+.footer__nav a { color: var(--footer-ink); text-decoration: none; font-size: 0.875rem; opacity: 0.82; }
 .footer__nav a:hover { opacity: 1; }
 .footer__fine { margin: 0; font-size: 0.8125rem; opacity: 0.7; }
 
