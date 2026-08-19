@@ -369,7 +369,8 @@ const FOLDER_FRAG = /* glsl */ `
     }
 
     // Draws itself left to right.
-    float reveal = step((vP.x + h.x) / (2.0 * h.x), uDraw + 0.02);
+    // Rises from the bottom, the same rule as the bars.
+    float reveal = step((vP.y + h.y) / (2.0 * h.y), uDraw + 0.02);
 
     // Neon: a bright core inside a soft halo.
     float core = smoothstep(uThick, 0.0, d);
@@ -776,7 +777,7 @@ export function createStory(canvas) {
     const ease = (v) => v * v * (3 - 2 * v);
     // 07: the information separates. The receipt keeps the image and moves
     // aside; a second copy of it becomes the row in the sheet.
-    const settle = ease(range(p, 0.552, 0.606));
+    const settle = ease(range(p, 0.582, 0.628));
 
     let i = 0;
     while (i < KEYS.length - 2 && p >= KEYS[i + 1][0]) i++;
@@ -788,8 +789,8 @@ export function createStory(canvas) {
     // Points arrive after the hero and leave before the FAQ.
     // The pile arrives with chapter 01 and empties out as the story advances:
     // that thinning is the promise the page is making.
-    crowdMat.uniforms.uAlpha.value = range(p, 0.03, 0.09) * (1 - range(p, 0.40, 0.54));
-    crowdMat.uniforms.uCull.value = range(p, 0.12, 0.46);
+    crowdMat.uniforms.uAlpha.value = range(p, 0.020, 0.070) * (1 - range(p, 0.330, 0.420));
+    crowdMat.uniforms.uCull.value = range(p, 0.100, 0.400);
 
     // Hold the folder while its chapter is read, then clear the stage so the
     // call to action is not competing with two thousand dots.
@@ -802,17 +803,17 @@ export function createStory(canvas) {
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
     paper.rotation.y = (1 - range(p, 0.04, 0.32)) * -0.45;
 
-    const scan = range(p, 0.29, 0.41);
-    paperMat.uniforms.uScan.value = p >= 0.29 && p <= 0.43 ? scan : -1;
+    const scan = range(p, 0.386, 0.442);
+    paperMat.uniforms.uScan.value = p >= 0.386 && p <= 0.460 ? scan : -1;
 
     // The receipt empties out once its numbers have lifted off, then comes
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
-    const gone = range(p, 0.612, 0.654);
+    const gone = range(p, 0.634, 0.672);
     const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
-    const arrive = range(p, 0.045, 0.10);
+    const arrive = range(p, 0.045, 0.100);
     paperMat.uniforms.uFade.value = ((1 - gone * 0.998) + filed * 0.92) * clear * arrive;
     const sc = 0.84 * (1 - settle * 0.44) * (1 - filed * 0.55);
     paper.scale.set(sc, sc, 1);
@@ -821,51 +822,51 @@ export function createStory(canvas) {
     // Edges found, locked, taken. This is what earns the switch to dark.
     // 02 rectangle -> 03 cyan sweeps the paper -> 04 full cyan and a flash
     // -> 05 the same receipt, inverted.
-    paperMat.uniforms.uWipe.value = ease(range(p, 0.432, 0.462));
-    paperMat.uniforms.uCyanHold.value = range(p, 0.430, 0.436) * (1 - range(p, 0.478, 0.514));
+    paperMat.uniforms.uWipe.value = ease(range(p, 0.500, 0.526));
+    paperMat.uniforms.uCyanHold.value = range(p, 0.498, 0.504) * (1 - range(p, 0.540, 0.574));
     paperMat.uniforms.uShutter.value =
-      ease(range(p, 0.459, 0.468)) * (1 - ease(range(p, 0.468, 0.488)));
-    paperMat.uniforms.uInvert.value = ease(range(p, 0.470, 0.510));
-    paperMat.uniforms.uExtract.value = range(p, 0.500, 0.545) * (1 - range(p, 0.620, 0.660));
+      ease(range(p, 0.520, 0.531)) * (1 - ease(range(p, 0.531, 0.554)));
+    paperMat.uniforms.uInvert.value = ease(range(p, 0.532, 0.568));
+    paperMat.uniforms.uExtract.value = range(p, 0.556, 0.596) * (1 - range(p, 0.638, 0.672));
 
-    const lock = range(p, 0.352, 0.418);
+    const lock = range(p, 0.440, 0.486);
     const e = lock * lock * (3.0 - 2.0 * lock);
     const psc = paper.scale.x;
     const tight = [(W / 2) * psc * 1.045, (H / 2) * psc * 1.015];
     capMat.uniforms.uHalf.value.set(
       tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.34));
     capMat.uniforms.uLen.value = 0.58 - e * 0.28;
-    capMat.uniforms.uFull.value = range(p, 0.408, 0.430);
+    capMat.uniforms.uFull.value = range(p, 0.482, 0.502);
     capMat.uniforms.uFlash.value =
-      range(p, 0.418, 0.430) * (1 - range(p, 0.430, 0.452)) * 0.30;
-    capture.visible = p > 0.30 && p < 0.53;
+      range(p, 0.492, 0.506) * (1 - range(p, 0.506, 0.530)) * 0.30;
+    capture.visible = p > 0.42 && p < 0.60;
     capture.position.x = paper.position.x;
     capture.position.y = paper.position.y;
     capMat.uniforms.uAlpha.value =
-      range(p, 0.326, 0.356) * (1 - range(p, 0.470, 0.512));
+      range(p, 0.430, 0.460) * (1 - range(p, 0.548, 0.590));
 
     // Solid folder outlines draw themselves around the two destinations.
     // 06 the pair, 08 the hand-off, 09 the one it ends in.
-    const fA = range(p, 0.612, 0.642) * (1 - range(p, 0.700, 0.730));
-    const fB = range(p, 0.844, 0.872) * (1 - range(p, 0.902, 0.928));
-    const fC = range(p, 0.936, 0.960) * (1 - range(p, 0.986, 0.999));
-    const fD = range(p, 0.748, 0.776) * (1 - range(p, 0.806, 0.832));   // 07
+    const fA = range(p, 0.632, 0.658) * (1 - range(p, 0.696, 0.720));
+    const fB = range(p, 0.810, 0.834) * (1 - range(p, 0.878, 0.900));
+    const fC = 0;   // the stored beat is gone
+    const fD = range(p, 0.702, 0.726) * (1 - range(p, 0.772, 0.794));   // dashboard
     folderMat.uniforms.uPhaseA.value.set(fA, fB, fC, fD);
     folderMat.uniforms.uDraw.value =
-      p < 0.735 ? ease(range(p, 0.610, 0.664))
-               : p < 0.80 ? ease(range(p, 0.752, 0.800))
-               : p < 0.86 ? ease(range(p, 0.848, 0.896))
-                          : ease(range(p, 0.938, 0.972));
+      p < 0.690 ? ease(range(p, 0.630, 0.686))
+               : p < 0.800 ? ease(range(p, 0.704, 0.762))
+               : p < 0.86 ? ease(range(p, 0.812, 0.870))
+                          : ease(range(p, 0.812, 0.870));
     folders.visible = Math.max(Math.max(fA, fB), Math.max(fC, fD)) > 0.005;
 
     // 10 the rows condense toward the ring rather than simply fading.
-    const toDash = ease(range(p, 0.614, 0.656));
-    sheet.visible = settle > 0.001 && p < 0.66;
-    sheetMat.opacity = range(p, 0.544, 0.576) * (1 - range(p, 0.610, 0.652));
+    const toDash = ease(range(p, 0.636, 0.676));
+    sheet.visible = settle > 0.001 && p < 0.70;
+    sheetMat.opacity = range(p, 0.578, 0.606) * (1 - range(p, 0.634, 0.670));
 
     // Reveal by showing only the left fraction of the texture at 1:1, so the
     // sheet writes itself in rather than stretching.
-    const wipe = Math.max(0.001, ease(range(p, 0.552, 0.600)));
+    const wipe = Math.max(0.001, ease(range(p, 0.584, 0.630)));
     sheetTex.repeat.x = wipe;
     const ss = 0.30 + 0.70 * settle;
     const fullW = SHEET_W * ss, w = fullW * wipe;

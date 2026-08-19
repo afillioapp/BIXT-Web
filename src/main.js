@@ -118,7 +118,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   // The page starts on paper and turns dark at the capture, then stays
   // dark through the call to action and the footer.
   const paintTheme = (sp) =>
-    document.body.classList.toggle("is-dark", sp > 0.472);
+    document.body.classList.toggle("is-dark", sp > 0.300);
   paintTheme(target);
 
   addEventListener("scroll", () => {

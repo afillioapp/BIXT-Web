@@ -107,7 +107,7 @@ body {
    off the top while its scene is still playing. */
 .ch__text {
   position: fixed; z-index: 2;
-  left: 0; right: 0; top: 56svh; bottom: auto;
+  left: 0; right: 0; top: 62svh; bottom: auto;
   width: 100%; max-width: 1080px; margin-inline: auto;
   padding-inline: var(--gutter);
   opacity: 0; pointer-events: none;
@@ -154,14 +154,6 @@ body {
 .eyebrow { margin: 0 0 20px; font-size: 0.8125rem; font-weight: 600;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint);
   display: flex; align-items: center; }
-.eyebrow__n {
-  color: var(--cyan-deep); font-variant-numeric: tabular-nums;
-  margin-right: 14px; padding-right: 14px; position: relative;
-}
-.eyebrow__n::after {
-  content: ""; position: absolute; right: 0; top: 50%;
-  width: 8px; height: 1px; background: currentColor; opacity: 0.5;
-}
 
 /* Keyword accent. --cyan-deep (6.21:1) not --cyan (3.14:1): the headline
    shrinks to 24px on a phone, which is right at the large-text boundary. */
@@ -169,7 +161,7 @@ body {
 
 .caption { font-size: 0.9375rem; color: var(--ink-faint); }
 
-.measure { max-width: 34ch; }
+.measure { max-width: 30ch; }
 .measure--center { margin-inline: auto; }
 .measure-tight { max-width: 20ch; }
 .headline + .body, .display + .body { margin-top: 20px; }
@@ -251,15 +243,17 @@ body {
 .ch__text--split { grid-template-columns: 1fr auto; gap: 72px; }
 }
 
-.ch__text--cta { display: grid; gap: 40px; align-items: start; }
-@media (min-width: 860px) {
-.ch__text--cta { grid-template-columns: 1.05fr 1fr; gap: 88px; align-items: center; }
-}
-.cta__act { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
-.cta__act .body { max-width: 32ch; }
+.ch__text--cta { text-align: center; align-items: center; display: flex;
+  flex-direction: column; gap: 15px; }
+.ch__text--cta .display--sm { font-size: clamp(1.625rem, 4.2vw, 3rem); }
+.ch__text--cta .eyebrow { justify-content: center; }
+.ch__text--cta .measure { max-width: 44ch; }
+.ch__text--cta .btn { margin-top: 6px; }
+
 .cta__act .btn { margin-top: 4px; }
 
 @media (max-width: 859px) {
+  .ch__text { top: 57svh; }
 /* Compacted so the CTA can share the one vertical start, instead of
      being the single chapter that begins somewhere else. */
   /* Scoped to the chapter: the base .price and .ticks rules are declared
