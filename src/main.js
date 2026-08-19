@@ -1,130 +1,133 @@
-/* Page wiring: scroll reveals, sticky-nav hairline, and the scroll-scrubbed
-   WebGL act with its static fallbacks. */
+/* Page wiring: the scroll progress bar, chapter activation, and the fixed
+   WebGL story driven by how far you are through the story section. */
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-/* ---------- reveal on scroll ---------- */
+/* ---------- hero + FAQ reveals ---------- */
 {
   const items = document.querySelectorAll(".reveal");
   items.forEach((el) => el.style.setProperty("--d", el.dataset.delay || 0));
-
   if (reduceMotion || !("IntersectionObserver" in window)) {
     items.forEach((el) => el.classList.add("is-in"));
   } else {
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          e.target.classList.add("is-in");
-          io.unobserve(e.target); // fire once
-        }
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" }
-    );
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); }
+    }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" });
     items.forEach((el) => io.observe(el));
   }
+}
+
+/* ---------- chapters take the stage as they arrive ---------- */
+{
+  const chapters = document.querySelectorAll(".ch");
+  if (!("IntersectionObserver" in window)) {
+    chapters.forEach((c) => c.classList.add("is-on"));
+  } else {
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) e.target.classList.toggle("is-on", e.isIntersecting);
+    }, { rootMargin: "-28% 0px -28% 0px" });
+    chapters.forEach((c) => io.observe(c));
+  }
+  // The hero is already on screen at load; don't make it wait for a scroll.
+  document.querySelector(".ch--hero")?.classList.add("is-on");
 }
 
 /* ---------- nav hairline ---------- */
 {
   const nav = document.getElementById("nav");
-  const onScroll = () => nav.classList.toggle("is-stuck", window.scrollY > 40);
-  onScroll();
-  addEventListener("scroll", onScroll, { passive: true });
+  const on = () => nav.classList.toggle("is-stuck", window.scrollY > 40);
+  on();
+  addEventListener("scroll", on, { passive: true });
 }
 
-/* ---------- the act ---------- */
-(async function act() {
-  const section = document.getElementById("act");
+/* ---------- the story ---------- */
+(async function story() {
+  const bar = document.getElementById("bar");
+  const progressEl = document.getElementById("progress");
+  const storyEl = document.getElementById("story");
   const canvas = document.getElementById("gl");
   const poster = document.getElementById("poster");
-  const caps = [...document.querySelectorAll(".act__cap")];
 
-  // Decide up front whether this device should run WebGL at all. A weak
-  // machine gets the poster rather than a stuttering canvas.
+  /** How far through the whole document, for the bottom bar. */
+  const pageProgress = () => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    return max > 0 ? clamp01(window.scrollY / max) : 0;
+  };
+
+  /** How far through the story chapters, for the scene. */
+  const storyProgress = () => {
+    const r = storyEl.getBoundingClientRect();
+    const travel = r.height - innerHeight;
+    return travel > 0 ? clamp01(-r.top / travel) : 0;
+  };
+
+  const paintBar = (p) => {
+    bar.style.transform = `scaleX(${p})`;
+    progressEl.setAttribute("aria-valuenow", Math.round(p * 100));
+  };
+  paintBar(pageProgress());
+
   const weak = (navigator.hardwareConcurrency || 4) <= 2;
   const supported = (() => {
-    try {
-      const c = document.createElement("canvas");
-      return !!(c.getContext("webgl2") || c.getContext("webgl"));
-    } catch { return false; }
+    try { const c = document.createElement("canvas");
+      return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; }
   })();
 
   const showPoster = () => {
     canvas.remove();
     poster.hidden = false;
-    section.classList.add("is-static");
-    caps[0]?.classList.add("is-on");
+    // Without the scene there is nothing to scrub, so the chapters do not
+    // need their extra scroll length.
+    document.querySelectorAll(".ch").forEach((c) => { c.style.minHeight = "100svh"; });
+    addEventListener("scroll", () => paintBar(pageProgress()), { passive: true });
   };
 
   if (!supported || weak) return showPoster();
 
   let scene;
   try {
-    const { createAct } = await import("./gl/receipt.js");
-    scene = createAct(canvas);
+    const { createStory } = await import("./gl/story.js");
+    scene = createStory(canvas);
   } catch (err) {
-    console.warn("[bx] WebGL act unavailable:", err);
+    console.warn("[bx] story unavailable:", err);
   }
   if (!scene) return showPoster();
 
   scene.resize();
 
-  // Progress through the pinned section, 0 at its top, 1 when its tail
-  // reaches the top of the viewport.
-  const progress = () => {
-    const r = section.getBoundingClientRect();
-    const travel = r.height - innerHeight;
-    if (travel <= 0) return 0;
-    return Math.min(1, Math.max(0, -r.top / travel));
-  };
-
-  const setCaption = (p) => {
-    const i = p < 0.34 ? 0 : p < 0.68 ? 1 : 2;
-    caps.forEach((c, n) => c.classList.toggle("is-on", n === i));
-  };
-
-  // Reduced motion keeps the story — it is scrubbed 1:1 by the reader's own
-  // scrolling, not autoplayed — but loses the inertial easing, so nothing
-  // carries on moving after the finger stops. Rendering a single frozen frame
-  // here instead (the previous behaviour) just looked broken on any phone with
-  // iOS "Reduce Motion" switched on.
-  const EASE = reduceMotion ? 1 : 0.12;
-
-  let target = progress();
+  let target = storyProgress();
   let current = target;
   let running = true;
   let queued = false;
 
+  // Reduced motion keeps the story — it is scrubbed 1:1 by the reader's own
+  // scrolling — but drops the inertia so nothing glides after they stop.
+  const EASE = reduceMotion ? 1 : 0.1;
+
   const loop = () => {
     if (!running) return;
-    // Ease toward the scroll position so trackpad jitter doesn't show.
     current += (target - current) * EASE;
     scene.apply(current);
     scene.render();
-    if (Math.abs(target - current) > 0.0005) {
-      requestAnimationFrame(loop);
-    } else {
-      queued = false;
-    }
+    if (Math.abs(target - current) > 0.0004) requestAnimationFrame(loop);
+    else queued = false;
   };
+  const kick = () => { if (queued || !running) return; queued = true; requestAnimationFrame(loop); };
 
-  const kick = () => {
-    if (queued || !running) return;
-    queued = true;
-    requestAnimationFrame(loop);
-  };
+  addEventListener("scroll", () => {
+    target = storyProgress();
+    paintBar(pageProgress());
+    kick();
+  }, { passive: true });
 
-  addEventListener("scroll", () => { target = progress(); setCaption(target); kick(); }, { passive: true });
-  addEventListener("resize", () => { scene.resize(); target = progress(); kick(); }, { passive: true });
+  addEventListener("resize", () => { scene.resize(); target = storyProgress(); kick(); }, { passive: true });
 
-  // Don't burn frames on a hidden tab.
   document.addEventListener("visibilitychange", () => {
     running = !document.hidden;
     if (running) { queued = false; kick(); }
   });
 
-  setCaption(target);
   scene.apply(current);
   scene.render();
 })();

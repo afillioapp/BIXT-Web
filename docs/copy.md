@@ -13,45 +13,26 @@
 - Links: `How it works` · `Pricing` · `Questions`
 - Button: `Get BX`
 
-## Hero
-- **Headline:** Your receipts, already with your accountant.
-- **Sub:** Take a photo. BX reads it, files it in your own Google Drive, and your accountant can already see it.
-- Primary button: `Get BX — $3 a month`
-- Secondary button: `See how it works`
+## Titles — the rule
 
-## The problem
-- **Eyebrow:** The shoebox
-- **Headline:** You know where the receipts are.
-- **Body:** In the van. In a jacket pocket. Folded into the back of a notebook. They’re not lost, exactly — they’re just not anywhere useful. Then April arrives and someone has to sort out eleven months of paper in a weekend.
+Every title on the site is **three words or fewer**, with one keyword wrapped
+in `<span class="hl">` so it reads cyan. No em dashes anywhere on the page.
+Body copy is one or two short sentences; if it needs a third, it is two
+chapters.
 
-## How it works — three steps
+## The story, in order
 
-**Step 1**
-- Label: `Snap it`
-- Headline: A photo is the whole job.
-- Body: Pay for something, take a picture of the receipt. That’s the part you have to remember. There isn’t a second part.
-
-**Step 2**
-- Label: `It gets read`
-- Headline: The numbers come off the paper.
-- Body: Claude reads the date, the vendor, the total and the sales tax. You get a quick look before anything is saved, so a smudged total never becomes a wrong number.
-
-**Step 3**
-- Label: `It’s filed`
-- Headline: Straight into the right month.
-- Body: The photo and a row in a spreadsheet, filed by year and month. No naming, no folders to make, no dragging things around on a Sunday night.
-
-## The accountant section
-- **Eyebrow:** The part that actually saves you
-- **Headline:** Your accountant already has it.
-- **Body:** You give their email address once, when you set up. From then on they can open the folder whenever they like and see everything in it — read-only, always current. No zip file in April. No “can you resend that one”. No portal for them to log into and forget the password to.
-- **Pull quote / large line:** Nothing to send. It’s already there.
-
-## Where your data lives
-- **Eyebrow:** Your Drive, not ours
-- **Headline:** It’s your Google Drive.
-- **Body:** BX doesn’t keep your receipts on a server somewhere. The folder is in your own Google Drive, under your own account. If you stopped using BX tomorrow, every photo and every spreadsheet would still be sitting exactly where it is, and you would still own all of it.
-- Reassurance line: You can open the folder yourself, right now, without us.
+| # | Eyebrow | Title | Body |
+|---|---|---|---|
+| — | — | No **paper** receipts. / *Just Bixt it.* | Hero. No buttons: the only call to action is at the end of the story. |
+| 01 | Where it starts | **Receipts** everywhere. | In the van. In a pocket. Never where you need them. |
+| 02 | Snap it | Take a **photo**. | That is the whole job. There is no second part. |
+| 03 | It gets read | **Numbers** come off. | Claude reads them. You check before anything saves. |
+| 04 | It gets filed | Filed by **month**. | Photo and spreadsheet row. Nothing to name. |
+| 05 | A year, handled | **Twelve months**, done. | Carried by the 12 / 1 / 0 stat row. |
+| 06 | How it ends | Your **accountant** sees. | Same folder, read only, always current. Nothing to send. |
+| 07 | Where it ends | **Stored**, not lost. | Back where it belongs. In your folder, in your Drive. |
+| — | Three dollars a month | Three **dollars** monthly. | The call to action. |
 
 ## Pricing
 - **Eyebrow:** Pricing

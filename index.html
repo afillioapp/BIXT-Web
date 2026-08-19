@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>BX — Receipts filed, and your accountant already has them</title>
+<title>BX. No paper receipts.</title>
 <meta name="description" content="Take a photo of a receipt. BX reads it and files it in your own Google Drive, where your accountant can already see it. $3 a month. No shoebox." />
-<meta property="og:title" content="Your receipts, already with your accountant." />
-<meta property="og:description" content="Snap a receipt. BX reads it and files it in your own Google Drive — your accountant sees it without you sending anything." />
+<meta property="og:title" content="No more paper receipts. Just Bixt it." />
+<meta property="og:description" content="Snap a receipt. BX reads it and files it in your own Google Drive, where your accountant can already see it." />
 <meta property="og:type" content="website" />
 <meta name="theme-color" content="#f3f5f9" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23111a2d'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='15' font-weight='700' fill='%23fff' text-anchor='middle'>BX</text></svg>" />
@@ -15,6 +15,20 @@
 <body>
 
 <a class="skip" href="#main">Skip to content</a>
+
+<!-- The story canvas sits behind everything and is driven by page scroll. -->
+<div class="stage" id="stage" aria-hidden="true">
+  <canvas class="stage__canvas" id="gl"></canvas>
+  <div class="stage__poster" id="poster" hidden>
+    <div class="poster__receipt">
+      <div class="poster__line poster__line--head"></div>
+      <div class="poster__line"></div><div class="poster__line"></div>
+      <div class="poster__line poster__line--short"></div>
+      <div class="poster__rule"></div>
+      <div class="poster__line poster__line--total"></div>
+    </div>
+  </div>
+</div>
 
 <header class="nav" id="nav">
   <div class="nav__in">
@@ -29,136 +43,107 @@
 </header>
 
 <main id="main">
+<div id="story">
 
-  <section class="hero" id="top">
-    <div class="wrap hero__in">
-      <h1 class="display reveal">Your receipts, already with your accountant.</h1>
-      <p class="body-lg measure reveal" data-delay="1">
-        Take a photo. BX reads it, files it in your own Google Drive, and your
-        accountant can already see it.
-      </p>
-      <div class="hero__cta reveal" data-delay="2">
-        <a class="btn btn--solid" href="#pricing">Get BX — $3 a month</a>
-        <a class="btn btn--ghost" href="#how">See how it works</a>
+  <section class="ch ch--hero" id="top">
+    <div class="ch__text ch__text--hero">
+      <h1 class="display reveal">No <span class="hl">paper</span> receipts.</h1>
+      <p class="hero__tag reveal" data-delay="1">Just Bixt it.</p>
+    </div>
+    <div class="ch__hint" aria-hidden="true"><span></span></div>
+  </section>
+
+  <section class="ch">
+    <div class="ch__text">
+      <p class="eyebrow"><span class="eyebrow__n">01</span>Where it starts</p>
+      <h2 class="headline measure-tight"><span class="hl">Receipts</span> everywhere.</h2>
+      <p class="body measure">In the van. In a pocket. Never where you need them.</p>
+    </div>
+  </section>
+
+  <section class="ch" id="how">
+    <div class="ch__text">
+      <p class="eyebrow"><span class="eyebrow__n">02</span>Snap it</p>
+      <h2 class="headline measure-tight">Take a <span class="hl">photo</span>.</h2>
+      <p class="body measure">That is the whole job. There is no second part.</p>
+    </div>
+  </section>
+
+  <section class="ch">
+    <div class="ch__text">
+      <p class="eyebrow"><span class="eyebrow__n">03</span>It gets read</p>
+      <h2 class="headline measure-tight"><span class="hl">Numbers</span> come off.</h2>
+      <p class="body measure">Claude reads them. You check before anything saves.</p>
+      <ul class="chips" aria-label="Fields read from the receipt">
+        <li>Date</li><li>Vendor</li><li>Total</li><li>Sales tax</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="ch">
+    <div class="ch__text">
+      <p class="eyebrow"><span class="eyebrow__n">04</span>It gets filed</p>
+      <h2 class="headline measure-tight">Filed by <span class="hl">month</span>.</h2>
+      <p class="body measure">Photo and spreadsheet row. Nothing to name.</p>
+      <div class="path" aria-label="Where the receipt is filed">
+        <span class="path__seg">BX - Northside Landscaping</span><span class="path__sep">/</span>
+        <span class="path__seg">2026</span><span class="path__sep">/</span>
+        <span class="path__seg">August</span><span class="path__sep">/</span>
+        <span class="path__seg path__seg--lit">Expenses</span>
       </div>
     </div>
-    <div class="hero__hint" aria-hidden="true"><span></span></div>
   </section>
 
-  <!-- The WebGL act. The canvas is pinned while this section scrolls. -->
-  <section class="act" id="act" aria-label="How a receipt becomes a filed row">
-    <div class="act__sticky">
-      <canvas class="act__canvas" id="gl"></canvas>
-      <div class="act__poster" id="poster" hidden aria-hidden="true">
-        <div class="poster__receipt">
-          <div class="poster__line poster__line--head"></div>
-          <div class="poster__line"></div><div class="poster__line"></div>
-          <div class="poster__line poster__line--short"></div>
-          <div class="poster__rule"></div>
-          <div class="poster__line poster__line--total"></div>
-        </div>
-      </div>
-      <div class="act__captions" aria-hidden="true">
-        <p class="act__cap" data-step="0">A photo of a receipt.</p>
-        <p class="act__cap" data-step="1">The numbers come off the paper.</p>
-        <p class="act__cap" data-step="2">Filed into the right month.</p>
+  <section class="ch">
+    <div class="ch__text">
+      <p class="eyebrow"><span class="eyebrow__n">05</span>A year, handled</p>
+      <h2 class="headline measure-tight"><span class="hl">Twelve months</span>, done.</h2>
+      <div class="stats">
+        <div><span class="stats__n">12</span><span class="stats__l">folders, made for you</span></div>
+        <div><span class="stats__n">1</span><span class="stats__l">spreadsheet per month</span></div>
+        <div><span class="stats__n">0</span><span class="stats__l">evenings sorting paper</span></div>
       </div>
     </div>
-    <div class="act__track"></div>
   </section>
 
-  <section class="section section--dark problem">
-    <div class="wrap">
-      <p class="eyebrow reveal">The shoebox</p>
-      <h2 class="headline measure-tight reveal" data-delay="1">You know where the receipts are.</h2>
-      <p class="body-lg measure reveal" data-delay="2">
-        In the van. In a jacket pocket. Folded into the back of a notebook.
-        They’re not lost, exactly — they’re just not anywhere useful. Then April
-        arrives and someone has to sort out eleven months of paper in a weekend.
-      </p>
-    </div>
-  </section>
-
-  <section class="section" id="how">
-    <div class="wrap">
-      <p class="eyebrow reveal">How it works</p>
-      <ol class="steps">
-        <li class="step reveal">
-          <span class="step__num">01</span>
-          <p class="step__label">Snap it</p>
-          <h3 class="title">A photo is the whole job.</h3>
-          <p class="body">Pay for something, take a picture of the receipt. That’s the part you have to remember. There isn’t a second part.</p>
-        </li>
-        <li class="step reveal" data-delay="1">
-          <span class="step__num">02</span>
-          <p class="step__label">It gets read</p>
-          <h3 class="title">The numbers come off the paper.</h3>
-          <p class="body">Claude reads the date, the vendor, the total and the sales tax. You get a quick look before anything is saved, so a smudged total never becomes a wrong number.</p>
-        </li>
-        <li class="step reveal" data-delay="2">
-          <span class="step__num">03</span>
-          <p class="step__label">It’s filed</p>
-          <h3 class="title">Straight into the right month.</h3>
-          <p class="body">The photo and a row in a spreadsheet, filed by year and month. No naming, no folders to make, no dragging things around on a Sunday night.</p>
-        </li>
-      </ol>
-    </div>
-  </section>
-
-  <section class="section accountant">
-    <div class="wrap">
-      <p class="eyebrow reveal">The part that actually saves you</p>
-      <h2 class="display display--sm measure-tight reveal" data-delay="1">Your accountant already has it.</h2>
-      <p class="body-lg measure reveal" data-delay="2">
-        You give their email address once, when you set up. From then on they can
-        open the folder whenever they like and see everything in it — read-only,
-        always current. No zip file in April. No “can you resend that one”. No
-        portal for them to log into and forget the password to.
-      </p>
-      <p class="pull reveal" data-delay="3">Nothing to send.<br />It’s already there.</p>
-    </div>
-  </section>
-
-  <section class="section section--dark drive">
-    <div class="wrap">
-      <p class="eyebrow reveal">Your Drive, not ours</p>
-      <h2 class="headline measure-tight reveal" data-delay="1">It’s your Google Drive.</h2>
-      <p class="body-lg measure reveal" data-delay="2">
-        BX doesn’t keep your receipts on a server somewhere. The folder is in your
-        own Google Drive, under your own account. If you stopped using BX tomorrow,
-        every photo and every spreadsheet would still be sitting exactly where it
-        is, and you would still own all of it.
-      </p>
-      <div class="path reveal" data-delay="3" aria-label="Folder structure example">
-        <span class="path__seg">BX — Northside Landscaping</span>
-        <span class="path__sep">/</span><span class="path__seg">2026</span>
-        <span class="path__sep">/</span><span class="path__seg">August</span>
-        <span class="path__sep">/</span><span class="path__seg path__seg--lit">Expenses</span>
+  <section class="ch">
+    <div class="ch__text ch__text--center">
+      <p class="eyebrow"><span class="eyebrow__n">06</span>How it ends</p>
+      <h2 class="display display--sm">Your <span class="hl">accountant</span> sees.</h2>
+      <p class="body measure measure--center">Same folder, read only, always current. Nothing to send.</p>
+      <div class="nodes" aria-hidden="true">
+        <span class="nodes__end">You</span>
+        <span class="nodes__link"></span>
+        <span class="nodes__end">Your accountant</span>
       </div>
-      <p class="caption reveal" data-delay="4">You can open the folder yourself, right now, without us.</p>
     </div>
   </section>
 
-  <section class="section pricing" id="pricing">
-    <div class="wrap wrap--center">
-      <p class="eyebrow reveal">Pricing</p>
-      <h2 class="headline reveal" data-delay="1">Three dollars a month.</h2>
-      <p class="body-lg measure measure--center reveal" data-delay="2">
-        About what you’d pay for a can of pop. Less than the parking ticket you got
-        picking up the receipt.
-      </p>
-      <p class="price reveal" data-delay="3"><span class="price__cur">$</span>3<span class="price__per">/month</span></p>
-      <ul class="ticks reveal" data-delay="4">
+  <section class="ch">
+    <div class="ch__text ch__text--center">
+      <p class="eyebrow"><span class="eyebrow__n">07</span>Where it ends</p>
+      <h2 class="headline"><span class="hl">Stored</span>, not lost.</h2>
+      <p class="body measure measure--center">Back where it belongs. In your folder, in your Drive, for as long as you want it.</p>
+    </div>
+  </section>
+
+  <section class="ch ch--cta" id="pricing">
+    <div class="ch__text ch__text--center">
+      <p class="eyebrow">Three dollars a month</p>
+      <h2 class="display display--sm">Three <span class="hl">dollars</span> monthly.</h2>
+      <p class="price"><span class="price__cur">$</span>3<span class="price__per">/month</span></p>
+      <ul class="ticks">
         <li>Unlimited receipts</li>
         <li>Your own Google Drive folder</li>
         <li>One accountant, read-only, always up to date</li>
-        <li>Works on the phone you already have</li>
-        <li>Cancel whenever — the folder stays yours</li>
+        <li>Cancel whenever, the folder stays yours</li>
       </ul>
-      <a class="btn btn--solid btn--lg reveal" data-delay="5" href="#top">Get BX</a>
-      <p class="caption reveal" data-delay="6">No card required to look around.</p>
+      <a class="btn btn--solid btn--lg" href="#top">Get BX</a>
+      <p class="caption">No card required to look around.</p>
     </div>
   </section>
+
+</div><!-- /#story -->
 
   <section class="section faq" id="faq">
     <div class="wrap wrap--narrow">
@@ -190,6 +175,10 @@
     <p class="footer__fine">© 2026 BX. Your receipts stay in your Google Drive.</p>
   </div>
 </footer>
+
+<div class="progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress">
+  <span class="progress__bar" id="bar"></span>
+</div>
 
 <script type="module" src="/src/main.js"></script>
 </body>
