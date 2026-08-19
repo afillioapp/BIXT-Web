@@ -35,20 +35,12 @@
 :root { --gutter: 64px; }
 }
 
-/* The middle of the journey runs on the dark ground. Everything is token
-   driven, so the whole page inverts by swapping the tokens; --cyan-deep has
-   to go lighter here or it disappears against the dark. */
-body.is-dark {
-  --paper:      oklch(0.205 0.035 264);
-  --paper-pure: oklch(0.26 0.035 264);
-  --ink:        oklch(0.97 0.005 260);
-  --ink-soft:   oklch(0.80 0.015 260);
-  --ink-faint:  oklch(0.685 0.020 260);
-  --rule:       oklch(1 0 0 / 0.16);
-  --cyan-deep:  oklch(0.80 0.10 190);
-}
-body { transition: background-color 1200ms cubic-bezier(0.33, 0, 0.2, 1),
-                    color 1200ms cubic-bezier(0.33, 0, 0.2, 1); }
+/* The dark ground is not a class. main.js interpolates these same tokens on
+   the capture's own scroll progress and writes them to the body, so the page
+   inverts in step with the receipt and reverses on the way back up. The dark
+   end of each ramp lives in THEME there; :root below is the paper end, and
+   the fallback whenever the scene never starts. --cyan-deep has to go lighter
+   on dark or it disappears into it. */
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
@@ -113,6 +105,10 @@ body {
   padding-inline: var(--gutter);
   opacity: 0; pointer-events: none;
   transition: opacity 420ms var(--ease);
+  /* A second, multiplying opacity. It has to be filter rather than opacity so
+     it composes with the arrival fade above instead of overwriting it, and so
+     it tracks the scrub per frame rather than inheriting that transition. */
+  filter: opacity(var(--veil, 1));
 }
 .ch.is-on .ch__text {
   opacity: 1; pointer-events: auto;

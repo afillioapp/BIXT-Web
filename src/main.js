@@ -108,6 +108,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const loop = () => {
     if (!running) return;
     current += (target - current) * EASE;
+    paintTheme(current);
     scene.apply(current);
     scene.render();
     if (Math.abs(target - current) > 0.0004) requestAnimationFrame(loop);
@@ -115,15 +116,65 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   };
   const kick = () => { if (queued || !running) return; queued = true; requestAnimationFrame(loop); };
 
-  // The page starts on paper and turns dark at the capture, then stays
-  // dark through the call to action and the footer.
-  const paintTheme = (sp) =>
-    document.body.classList.toggle("is-dark", sp > 0.300);
+  /* The ground carries the meaning: paper while the receipt is still paper,
+     dark once it has been photographed. So it is not a class that flips at a
+     section boundary — it is the light and dark token sets interpolated on the
+     same scrubbed progress value that drives the capture itself. Scroll back
+     up and the page returns to paper in step with the receipt.
+
+     [light L,C,H,alpha] -> [dark L,C,H,alpha]. oklch interpolates cleanly,
+     which is the reason the palette is written in it. --footer-* are absent on
+     purpose: the footer never inverts. */
+  const THEME = {
+    "--paper":      [[0.970, 0.005, 260, 1], [0.205, 0.035, 264, 1]],
+    "--paper-pure": [[1.000, 0.000, 0,   1], [0.260, 0.035, 264, 1]],
+    "--ink":        [[0.220, 0.040, 264, 1], [0.970, 0.005, 260, 1]],
+    "--ink-soft":   [[0.420, 0.030, 264, 1], [0.800, 0.015, 260, 1]],
+    "--ink-faint":  [[0.505, 0.022, 264, 1], [0.685, 0.020, 260, 1]],
+    "--rule":       [[0.900, 0.008, 260, 1], [1.000, 0.000, 0,   0.16]],
+    "--cyan-deep":  [[0.460, 0.085, 195, 1], [0.800, 0.100, 190, 1]],
+  };
+
+  /* The hinge, and the same window story.js gives paperMat.uInvert: the
+     ground turns over on precisely the scroll the receipt turns over on, so
+     they are one movement. Keep these two in sync if either moves. The beats
+     leading in are the frame locking (0.44), the flash (0.49) and the cyan
+     sweep (0.50), so this begins well inside the capture. */
+  const DARK_FROM = 0.532, DARK_TO = 0.568;
+  const bodyStyle = document.body.style;
+  let lastMix = -1;
+
+  const smooth = (v) => { const c = clamp01(v); return c * c * (3 - 2 * c); };
+
+  const paintTheme = (sp) => {
+    const t = clamp01((sp - DARK_FROM) / (DARK_TO - DARK_FROM));
+    const mix = smooth(t);                      // the scene's own smoothstep
+    // Outside the crossing this settles and stops touching the cascade.
+    if (Math.abs(mix - lastMix) < 0.002) return;
+    lastMix = mix;
+
+    /* Inverting a page continuously means the ground must pass through the
+       lightness the text is already sitting at: measured at the midpoint, body
+       copy hits 1.03:1 and is effectively invisible. So the words stand down
+       through the hinge and come back on the other side, which is also the
+       better reading of the moment. Anywhere contrast is unacceptable the veil
+       has taken the text below 0.15, so it reads as absent rather than as
+       something you ought to be able to read. */
+    const veil = 1 - smooth(mix / 0.06) * (1 - smooth((mix - 0.88) / 0.09));
+    bodyStyle.setProperty("--veil", veil.toFixed(4));
+    for (const key in THEME) {
+      const [a, b] = THEME[key];
+      const L = a[0] + (b[0] - a[0]) * mix, C = a[1] + (b[1] - a[1]) * mix;
+      const H = a[2] + (b[2] - a[2]) * mix, A = a[3] + (b[3] - a[3]) * mix;
+      bodyStyle.setProperty(key,
+        `oklch(${L.toFixed(4)} ${C.toFixed(4)} ${H.toFixed(2)}` +
+        (A < 0.999 ? ` / ${A.toFixed(3)}` : "") + `)`);
+    }
+  };
   paintTheme(target);
 
   addEventListener("scroll", () => {
     target = storyProgress();
-    paintTheme(target);
     paintBar(pageProgress());
     kick();
   }, { passive: true });
