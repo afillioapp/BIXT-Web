@@ -19,6 +19,27 @@
 <!-- The story canvas sits behind everything and is driven by page scroll. -->
 <div class="stage" id="stage" aria-hidden="true">
   <canvas class="stage__canvas" id="gl"></canvas>
+  <figure class="odonut" id="odonut" aria-label="Share of spending: fuel 35 percent, meals 30 percent, supplies 20 percent, tools 15 percent">
+    <div class="odonut__ring">
+      <svg viewBox="0 0 220 220" role="img" aria-hidden="true">
+        <circle class="od__track" cx="110" cy="110" r="80" />
+        <circle class="od__seg od__seg--1" cx="110" cy="110" r="80" />
+        <circle class="od__seg od__seg--2" cx="110" cy="110" r="80" />
+        <circle class="od__seg od__seg--3" cx="110" cy="110" r="80" />
+        <circle class="od__seg od__seg--4" cx="110" cy="110" r="80" />
+      </svg>
+      <span class="od__pct od__pct--1" style="--a:63deg">35%</span>
+      <span class="od__pct od__pct--2" style="--a:180deg">30%</span>
+      <span class="od__pct od__pct--3" style="--a:270deg">20%</span>
+      <span class="od__pct od__pct--4" style="--a:333deg">15%</span>
+      <span class="od__mid"><i>This month</i><b>$3,532.43</b></span>
+    </div>
+    <ul class="od__key">
+      <li><i class="k1"></i>Fuel</li><li><i class="k2"></i>Meals</li>
+      <li><i class="k3"></i>Supplies</li><li><i class="k4"></i>Tools</li>
+    </ul>
+  </figure>
+
   <div class="stage__poster" id="poster" hidden>
     <div class="poster__receipt">
       <div class="poster__line poster__line--head"></div>
@@ -115,43 +136,26 @@
   </section>
 
   <section class="ch">
-    <div class="ch__text ch__text--split">
-      <div>
+    <div class="ch__text">
       <p class="eyebrow"><span class="eyebrow__n">07</span>In the app</p>
       <h2 class="headline measure-tight">Track your <span class="hl">spending</span>.</h2>
       <p class="body measure">A dashboard that fills itself in, so you can see where the money went without opening a spreadsheet.</p>
-      </div>
-      <figure class="donut" aria-label="Share of spending by category: fuel 35 percent, meals 30 percent, supplies 20 percent, tools 15 percent">
-        <svg viewBox="0 0 220 220" role="img">
-          <circle class="donut__seg donut__seg--1" cx="110" cy="110" r="80" />
-          <circle class="donut__seg donut__seg--2" cx="110" cy="110" r="80" />
-          <circle class="donut__seg donut__seg--3" cx="110" cy="110" r="80" />
-          <circle class="donut__seg donut__seg--4" cx="110" cy="110" r="80" />
-        </svg>
-        <figcaption class="donut__mid"><span>This month</span><b>$3,532.43</b></figcaption>
-        <ul class="donut__key">
-          <li><i class="k1"></i>Fuel <b>35%</b></li>
-          <li><i class="k2"></i>Meals <b>30%</b></li>
-          <li><i class="k3"></i>Supplies <b>20%</b></li>
-          <li><i class="k4"></i>Tools <b>15%</b></li>
-        </ul>
-      </figure>
     </div>
   </section>
 
   <section class="ch">
-    <div class="ch__text ch__text--center">
+    <div class="ch__text">
       <p class="eyebrow"><span class="eyebrow__n">08</span>How it ends</p>
       <h2 class="display display--sm">Your <span class="hl">accountant</span> sees.</h2>
-      <p class="body measure measure--center">Same folder, read only, always current. Nothing to send.</p>
+      <p class="body measure">Same folder, read only, always current. Nothing to send.</p>
     </div>
   </section>
 
   <section class="ch">
-    <div class="ch__text ch__text--center">
+    <div class="ch__text">
       <p class="eyebrow"><span class="eyebrow__n">09</span>Where it ends</p>
       <h2 class="headline"><span class="hl">Stored</span>, not lost.</h2>
-      <p class="body measure measure--center">In your folder, in your Drive, for as long as you want it.</p>
+      <p class="body measure">In your folder, in your Drive, for as long as you want it.</p>
     </div>
   </section>
 
@@ -181,13 +185,13 @@
 </main>
 
 <footer class="footer">
-  <div class="wrap">
+  <div class="footer__in">
+    <span class="footer__mark">BX</span>
     <p class="footer__line">Take a photo. That’s it.</p>
-    <div class="footer__cols">
-      <div><p class="footer__h">Product</p><a href="#how">How it works</a><a href="#pricing">Pricing</a></div>
-      <div><p class="footer__h">Company</p><a href="#top">Privacy</a><a href="#top">Terms</a><a href="#top">Contact</a></div>
-    </div>
-    <p class="footer__fine">© 2026 Bixt. Your receipts stay in your Google Drive.</p>
+    <nav class="footer__nav" aria-label="Footer">
+      <a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#top">Privacy</a>
+    </nav>
+    <p class="footer__fine">© 2026 Bixt</p>
   </div>
 </footer>
 

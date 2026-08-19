@@ -40,14 +40,14 @@ const PAPER_VERT = /* glsl */ `
     vec3 p = position;
     float n  = noise(uv * 4.0) * 2.0 - 1.0;
           n += (noise(uv * 9.0) * 2.0 - 1.0) * 0.5;
-    float z = n * 0.22 * uCrumple;
+    float z = n * 0.13 * uCrumple;
     p.z += z; vShade = z;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
 `;
 
 const PAPER_FRAG = /* glsl */ `
-  uniform float uScan, uFade, uReveal;
+  uniform float uScan, uFade, uReveal, uShutter;
   uniform vec3 uInk, uCyan;
   uniform sampler2D uTex;
   varying vec2 vUv; varying float vShade;
@@ -113,63 +113,103 @@ const PAPER_FRAG = /* glsl */ `
     float tear = 0.020 + 0.016 * abs(fract(vUv.x * 11.0) - 0.5) * 2.0;
     if (vUv.y < tear) discard;
 
+    // The shutter: the whole receipt blows out to cyan, then comes back.
+    col = mix(col, uCyan, uShutter * 0.94);
+
     float edge = smoothstep(0.0, 0.030, vUv.x) * smoothstep(1.0, 0.970, vUv.x)
                * smoothstep(1.0, 0.988, vUv.y);
-    gl_FragColor = vec4(col, uFade * edge);
+    gl_FragColor = vec4(col, min(1.0, uFade + uShutter * 0.9) * edge);
   }
 `;
 
 /* ---------- the pile: many receipts, out of focus ---------- */
 
-const CROWD = 54;
+const CROWD = 38;
 
 const CROWD_VERT = /* glsl */ `
   attribute vec3 aOffset;
   attribute vec2 aScale;
   attribute float aRot;
   attribute float aSeed;
+  attribute vec2 aTilt;
   uniform float uCull, uAlpha;
   varying vec2 vUv;
-  varying float vA, vSeed;
+  varying float vA, vSeed, vShade;
+
+  float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+  float noise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
 
   void main() {
     vUv = uv;
     vSeed = aSeed;
     // As uCull rises the pile thins out, one receipt at a time.
     vA = uAlpha * step(uCull, aSeed);
-    vec2 p = position.xy * aScale;
+
+    // Crumple: two octaves, stretched along the roll so the creases run
+    // across the paper the way they do when one is stuffed in a pocket.
+    vec2 q = uv * vec2(2.6, 6.5) + aSeed * 53.0;
+    float n  = noise(q) * 2.0 - 1.0;
+          n += (noise(q * 2.4) * 2.0 - 1.0) * 0.45;
+          n += (noise(q * 5.1) * 2.0 - 1.0) * 0.18;
+    vShade = n;
+
+    vec3 p = vec3(position.xy * aScale, n * 0.055 * aScale.x);
+
+    // Tilt out of plane first, then spin in it.
+    float cx = cos(aTilt.x), sx = sin(aTilt.x);
+    p = vec3(p.x, p.y * cx - p.z * sx, p.y * sx + p.z * cx);
+    float cy = cos(aTilt.y), sy = sin(aTilt.y);
+    p = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
     float c = cos(aRot), sn = sin(aRot);
-    vec3 world = vec3(p.x * c - p.y * sn, p.x * sn + p.y * c, 0.0) + aOffset;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(world, 1.0);
+    p = vec3(p.x * c - p.y * sn, p.x * sn + p.y * c, p.z);
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p + aOffset, 1.0);
   }
 `;
 
 const CROWD_FRAG = /* glsl */ `
   uniform vec3 uInk;
   varying vec2 vUv;
-  varying float vA, vSeed;
+  varying float vA, vSeed, vShade;
 
   void main() {
     if (vA < 0.01) discard;
+
     // No post-processing pass: depth of field is faked by softening the edges
     // and the printing in step with how far back the receipt sits.
-    float blur = 0.07 + vSeed * 0.20;
+    float blur = 0.045 + vSeed * 0.105;
+
+    // Torn off the roll, and never a clean rectangle.
+    float tear = 0.028 + 0.022 * abs(fract(vUv.x * 9.0 + vSeed * 7.0) - 0.5) * 2.0;
+    if (vUv.y < tear) discard;
+
     float mask = smoothstep(0.0, blur, vUv.x) * smoothstep(1.0, 1.0 - blur, vUv.x)
-               * smoothstep(0.0, blur * 0.45, vUv.y) * smoothstep(1.0, 1.0 - blur * 0.45, vUv.y);
+               * smoothstep(tear, tear + blur * 0.5, vUv.y) * smoothstep(1.0, 1.0 - blur * 0.4, vUv.y);
+
+    // Creases catch and lose the light; that shading is what reads as crumple.
+    float lit = 1.0 - vShade * 0.115;
+    vec3 col = vec3(1.0) * lit;
 
     float lines = 0.0;
-    for (int i = 0; i < 6; i++) {
-      float y = 0.80 - float(i) * 0.12;
-      lines += smoothstep(0.015 + blur * 0.6, 0.0, abs(vUv.y - y))
-             * step(0.20, vUv.x) * step(vUv.x, 0.76);
+    for (int i = 0; i < 7; i++) {
+      float y = 0.84 - float(i) * 0.105;
+      lines += smoothstep(0.012 + blur * 0.55, 0.0, abs(vUv.y - y))
+             * step(0.19, vUv.x) * step(vUv.x, 0.55 + mod(float(i), 3.0) * 0.09);
     }
-    vec3 col = mix(vec3(1.0), uInk, clamp(lines, 0.0, 1.0) * 0.22 * (1.0 - blur * 1.8));
-    gl_FragColor = vec4(col, mask * vA * (0.68 - vSeed * 0.26));
+    col = mix(col, uInk, clamp(lines, 0.0, 1.0) * 0.17 * (1.0 - blur * 1.7));
+
+    gl_FragColor = vec4(col, mask * vA * (0.40 - vSeed * 0.15));
   }
 `;
 
 function buildCrowd() {
-  const base = new PlaneGeometry(1, 1);
+  // Subdivided, or there are no vertices to crumple.
+  const base = new PlaneGeometry(1, 1, 8, 20);
   const g = new InstancedBufferGeometry();
   g.index = base.index;
   g.attributes.position = base.attributes.position;
@@ -180,20 +220,24 @@ function buildCrowd() {
   const scl = new Float32Array(CROWD * 2);
   const rot = new Float32Array(CROWD);
   const sed = new Float32Array(CROWD);
+  const tlt = new Float32Array(CROWD * 2);
   for (let i = 0; i < CROWD; i++) {
     off[i * 3] = rnd(-5.0, 5.0);
-    off[i * 3 + 1] = rnd(-3.2, 3.2);
-    off[i * 3 + 2] = rnd(-4.2, -0.9);          // always behind the hero receipt
-    const w = rnd(0.42, 0.86);
+    off[i * 3 + 1] = rnd(-3.4, 3.4);
+    off[i * 3 + 2] = rnd(-5.2, -1.4);          // always behind the hero receipt
+    const w = rnd(0.40, 0.84);
     scl[i * 2] = w;
-    scl[i * 2 + 1] = w * rnd(2.1, 3.2);        // till-roll proportions
-    rot[i] = rnd(-0.9, 0.9);
+    scl[i * 2 + 1] = w * rnd(2.2, 3.4);        // till-roll proportions
+    rot[i] = rnd(-1.1, 1.1);
+    tlt[i * 2] = rnd(-0.34, 0.34);
+    tlt[i * 2 + 1] = rnd(-0.34, 0.34);
     sed[i] = Math.random();
   }
   g.setAttribute("aOffset", new InstancedBufferAttribute(off, 3));
   g.setAttribute("aScale", new InstancedBufferAttribute(scl, 2));
   g.setAttribute("aRot", new InstancedBufferAttribute(rot, 1));
   g.setAttribute("aSeed", new InstancedBufferAttribute(sed, 1));
+  g.setAttribute("aTilt", new InstancedBufferAttribute(tlt, 2));
   return g;
 }
 
@@ -476,8 +520,8 @@ function buildFormations() {
 
 /* Chapter keyframes across global page scroll. */
 const KEYS = [
-  [0.00, "ink"],        [0.50, "ink"],    [0.60, "twoFolders"],
-  [0.70, "dashboard"],  [0.79, "share"],  [0.89, "folder"], [1.00, "folder"],
+  [0.00, "ink"],       [0.50, "ink"],   [0.62, "twoFolders"],
+  [0.79, "share"],     [0.89, "folder"], [1.00, "folder"],
 ];
 
 export function createStory(canvas) {
@@ -492,12 +536,12 @@ export function createStory(canvas) {
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(0, 0, 8.6);
+  camera.position.set(0, 0, 9.3);
 
   const paperMat = new ShaderMaterial({
     vertexShader: PAPER_VERT, fragmentShader: PAPER_FRAG, transparent: true,
     uniforms: { uCrumple: { value: 1 }, uScan: { value: -1 }, uFade: { value: 1 },
-                uReveal: { value: 0 }, uTex: { value: makeReceiptTexture() },
+                uReveal: { value: 0 }, uShutter: { value: 0 }, uTex: { value: makeReceiptTexture() },
                 uInk: { value: INK }, uCyan: { value: CYAN } },
   });
   const paper = new Mesh(new PlaneGeometry(W, H, 48, 64), paperMat);
@@ -563,7 +607,9 @@ export function createStory(canvas) {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.position.z = w / h < 0.8 ? 11.5 : 8.6;
+    const narrow = w / h < 0.95;
+    camera.position.z = w / h < 0.8 ? 12.4 : 9.3;
+    camera.position.x = narrow ? 0 : -0.95;
     camera.updateProjectionMatrix();
     dustMat.uniforms.uSize.value = Math.min(w, h) * 0.10;
   }
@@ -585,6 +631,8 @@ export function createStory(canvas) {
 
     // Hold the folder while its chapter is read, then clear the stage so the
     // call to action is not competing with two thousand dots.
+    // The bars are the chart for this stretch; the cloud would only fight it.
+    const chartHold = range(p, 0.618, 0.652) * (1 - range(p, 0.772, 0.806));
     dustMat.uniforms.uAlpha.value =
       range(p, 0.34, 0.46) * (1 - range(p, 0.945, 0.985) * 0.96);
 
@@ -604,12 +652,20 @@ export function createStory(canvas) {
     const clear = 1 - range(p, 0.945, 0.985);
     const arrive = range(p, 0.045, 0.10);
     paperMat.uniforms.uFade.value = ((1 - gone * 0.998) + filed * 0.92) * clear * arrive;
-    const sc = 1 - filed * 0.72;
+    const sc = 0.84 * (1 - filed * 0.72);
     paper.scale.set(sc, sc, 1);
     paper.position.y = -filed * 0.10;
 
     // Edges found, locked, taken. This is what earns the switch to dark.
-    paperMat.uniforms.uReveal.value = range(p, 0.425, 0.470);
+    // Fast in, slower out, the way a shutter reads.
+    const shutter = (() => {
+      const up = range(p, 0.424, 0.431);
+      const down = 1 - range(p, 0.431, 0.474);
+      const v = Math.min(up, down);
+      return v * v * (3 - 2 * v);
+    })();
+    paperMat.uniforms.uShutter.value = shutter;
+    paperMat.uniforms.uReveal.value = range(p, 0.431, 0.478);
     const lock = range(p, 0.355, 0.425);
     const e = lock * lock * (3.0 - 2.0 * lock);
     const tight = [W * 0.56, H * 0.53];
@@ -618,11 +674,11 @@ export function createStory(canvas) {
     capMat.uniforms.uLen.value = 0.58 - e * 0.28;
     capMat.uniforms.uFull.value = range(p, 0.415, 0.437);
     capMat.uniforms.uFlash.value =
-      range(p, 0.425, 0.437) * (1 - range(p, 0.437, 0.465));
+      range(p, 0.425, 0.437) * (1 - range(p, 0.437, 0.465)) * 0.35;
     capMat.uniforms.uAlpha.value =
       range(p, 0.330, 0.360) * (1 - range(p, 0.455, 0.505));
 
-    camera.position.y = -0.85 - range(p, 0.6, 0.95) * 0.25;
+    camera.position.y = -0.42 - range(p, 0.6, 0.95) * 0.25;
   }
 
   return {
