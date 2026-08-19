@@ -12,7 +12,7 @@
 
 import {
   Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry, BufferGeometry,
-  InstancedBufferGeometry, InstancedBufferAttribute,
+  InstancedBufferGeometry, InstancedBufferAttribute, IcosahedronGeometry,
   BufferAttribute, ShaderMaterial, Mesh, Points, Color, AdditiveBlending, Vector2, CanvasTexture, SRGBColorSpace,
 } from "three";
 
@@ -135,92 +135,84 @@ const PAPER_FRAG = /* glsl */ `
 
 /* ---------- the pile: many receipts, out of focus ---------- */
 
-const CROWD = 38;
+const CROWD = 44;
 
 const CROWD_VERT = /* glsl */ `
   attribute vec3 aOffset;
-  attribute vec2 aScale;
-  attribute float aRot;
+  attribute float aScale;
   attribute float aSeed;
-  attribute vec2 aTilt;
+  attribute vec3 aSpin;
   uniform float uCull, uAlpha;
-  varying vec2 vUv;
-  varying float vA, vSeed, vShade;
+  varying float vA, vSeed, vShade, vRim;
+  varying vec3 vN;
 
-  float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
-  float noise(vec2 p){
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
+  float noise(vec3 p){
+    vec3 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float n000 = hash(i), n100 = hash(i + vec3(1,0,0));
+    float n010 = hash(i + vec3(0,1,0)), n110 = hash(i + vec3(1,1,0));
+    float n001 = hash(i + vec3(0,0,1)), n101 = hash(i + vec3(1,0,1));
+    float n011 = hash(i + vec3(0,1,1)), n111 = hash(i + vec3(1,1,1));
+    return mix(mix(mix(n000,n100,f.x), mix(n010,n110,f.x), f.y),
+               mix(mix(n001,n101,f.x), mix(n011,n111,f.x), f.y), f.z);
+  }
+
+  mat3 rot(vec3 a) {
+    float cx=cos(a.x), sx=sin(a.x), cy=cos(a.y), sy=sin(a.y), cz=cos(a.z), sz=sin(a.z);
+    return mat3(cy*cz, -cy*sz, sy,
+                sx*sy*cz + cx*sz, -sx*sy*sz + cx*cz, -sx*cy,
+                -cx*sy*cz + sx*sz, cx*sy*sz + sx*cz, cx*cy);
   }
 
   void main() {
-    vUv = uv;
     vSeed = aSeed;
-    // As uCull rises the pile thins out, one receipt at a time.
     vA = uAlpha * step(uCull, aSeed);
 
-    // Crumple: two octaves, stretched along the roll so the creases run
-    // across the paper the way they do when one is stuffed in a pocket.
-    vec2 q = uv * vec2(2.6, 6.5) + aSeed * 53.0;
-    float n  = noise(q) * 2.0 - 1.0;
-          n += (noise(q * 2.4) * 2.0 - 1.0) * 0.45;
-          n += (noise(q * 5.1) * 2.0 - 1.0) * 0.18;
-    vShade = n;
+    // Screw the sphere up: layered noise pushed along the normal, so the
+    // silhouette itself goes lumpy the way a balled-up receipt does.
+    vec3 n = normalize(position);
+    float d  = noise(n * 3.1 + aSeed * 41.0) - 0.5;
+          d += (noise(n * 6.7 + aSeed * 17.0) - 0.5) * 0.55;
+          d += (noise(n * 13.0 + aSeed * 7.0) - 0.5) * 0.22;
+    vShade = d;
 
-    vec3 p = vec3(position.xy * aScale, n * 0.055 * aScale.x);
+    vec3 p = n * (0.5 + d * 0.40) * aScale;
+    p = rot(aSpin) * p;
 
-    // Tilt out of plane first, then spin in it.
-    float cx = cos(aTilt.x), sx = sin(aTilt.x);
-    p = vec3(p.x, p.y * cx - p.z * sx, p.y * sx + p.z * cx);
-    float cy = cos(aTilt.y), sy = sin(aTilt.y);
-    p = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
-    float c = cos(aRot), sn = sin(aRot);
-    p = vec3(p.x * c - p.y * sn, p.x * sn + p.y * c, p.z);
-
+    // Creases facing the light catch it; the rim softens the edge.
+    vec3 wn = normalize(rot(aSpin) * n);
+    vN = wn;
+    vRim = 1.0 - abs(wn.z);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p + aOffset, 1.0);
   }
 `;
 
 const CROWD_FRAG = /* glsl */ `
-  uniform vec3 uInk;
-  varying vec2 vUv;
-  varying float vA, vSeed, vShade;
-
+  varying float vA, vSeed, vShade, vRim;
+  varying vec3 vN;
   void main() {
     if (vA < 0.01) discard;
 
-    // No post-processing pass: depth of field is faked by softening the edges
-    // and the printing in step with how far back the receipt sits.
-    float blur = 0.045 + vSeed * 0.105;
+    // White paper on a near-white ground only reads if it has real form, so
+    // light it properly: a key from upper left, creases darkened, and the
+    // whole thing flattened the further back it sits.
+    float soft = 0.30 + vSeed * 0.42;
+    vec3 L = normalize(vec3(-0.45, 0.72, 0.52));
+    float lam = clamp(dot(vN, L) * 0.5 + 0.5, 0.0, 1.0);
+    float crease = clamp(vShade, -0.5, 0.5);
 
-    // Torn off the roll, and never a clean rectangle.
-    float tear = 0.028 + 0.022 * abs(fract(vUv.x * 9.0 + vSeed * 7.0) - 0.5) * 2.0;
-    if (vUv.y < tear) discard;
+    float lit = 0.60 + 0.40 * lam - crease * 0.42;
+    lit = mix(lit, 0.93, soft * 0.55);                 // distance washes it out
+    vec3 col = vec3(0.99, 0.99, 1.0) * clamp(lit, 0.55, 1.02);
 
-    float mask = smoothstep(0.0, blur, vUv.x) * smoothstep(1.0, 1.0 - blur, vUv.x)
-               * smoothstep(tear, tear + blur * 0.5, vUv.y) * smoothstep(1.0, 1.0 - blur * 0.4, vUv.y);
-
-    // Creases catch and lose the light; that shading is what reads as crumple.
-    float lit = 1.0 - vShade * 0.115;
-    vec3 col = vec3(1.0) * lit;
-
-    float lines = 0.0;
-    for (int i = 0; i < 7; i++) {
-      float y = 0.84 - float(i) * 0.105;
-      lines += smoothstep(0.012 + blur * 0.55, 0.0, abs(vUv.y - y))
-             * step(0.19, vUv.x) * step(vUv.x, 0.55 + mod(float(i), 3.0) * 0.09);
-    }
-    col = mix(col, uInk, clamp(lines, 0.0, 1.0) * 0.17 * (1.0 - blur * 1.7));
-
-    gl_FragColor = vec4(col, mask * vA * (0.40 - vSeed * 0.15));
+    float a = vA * (0.92 - vSeed * 0.34) * (1.0 - vRim * 0.22);
+    gl_FragColor = vec4(col, a);
   }
 `;
 
 function buildCrowd() {
-  // Subdivided, or there are no vertices to crumple.
-  const base = new PlaneGeometry(1, 1, 8, 20);
+  const base = new IcosahedronGeometry(1, 3);          // enough vertices to crumple
   const g = new InstancedBufferGeometry();
   g.index = base.index;
   g.attributes.position = base.attributes.position;
@@ -228,27 +220,23 @@ function buildCrowd() {
   g.instanceCount = CROWD;
 
   const off = new Float32Array(CROWD * 3);
-  const scl = new Float32Array(CROWD * 2);
-  const rot = new Float32Array(CROWD);
+  const scl = new Float32Array(CROWD);
   const sed = new Float32Array(CROWD);
-  const tlt = new Float32Array(CROWD * 2);
+  const spin = new Float32Array(CROWD * 3);
   for (let i = 0; i < CROWD; i++) {
-    off[i * 3] = rnd(-5.0, 5.0);
+    off[i * 3] = rnd(-5.4, 5.4);
     off[i * 3 + 1] = rnd(-3.4, 3.4);
-    off[i * 3 + 2] = rnd(-5.2, -1.4);          // always behind the hero receipt
-    const w = rnd(0.40, 0.84);
-    scl[i * 2] = w;
-    scl[i * 2 + 1] = w * rnd(2.2, 3.4);        // till-roll proportions
-    rot[i] = rnd(-1.1, 1.1);
-    tlt[i * 2] = rnd(-0.34, 0.34);
-    tlt[i * 2 + 1] = rnd(-0.34, 0.34);
+    off[i * 3 + 2] = rnd(-5.4, -1.2);        // always behind the receipt
+    scl[i] = rnd(0.42, 0.98);
     sed[i] = Math.random();
+    spin[i * 3] = rnd(0, 6.28);
+    spin[i * 3 + 1] = rnd(0, 6.28);
+    spin[i * 3 + 2] = rnd(0, 6.28);
   }
   g.setAttribute("aOffset", new InstancedBufferAttribute(off, 3));
-  g.setAttribute("aScale", new InstancedBufferAttribute(scl, 2));
-  g.setAttribute("aRot", new InstancedBufferAttribute(rot, 1));
+  g.setAttribute("aScale", new InstancedBufferAttribute(scl, 1));
   g.setAttribute("aSeed", new InstancedBufferAttribute(sed, 1));
-  g.setAttribute("aTilt", new InstancedBufferAttribute(tlt, 2));
+  g.setAttribute("aSpin", new InstancedBufferAttribute(spin, 3));
   return g;
 }
 
@@ -282,6 +270,92 @@ const DUST_FRAG = /* glsl */ `
     gl_FragColor = vec4(uCyan, vAlpha * smoothstep(0.5, 0.0, d));
   }
 `;
+
+/* ---------- folders, drawn as solid lines ---------- */
+
+/* Stroked geometry, not a cloud of points: at this size particles read as
+   noise, and the site's line language is the solid rule under the wordmark. */
+
+const FOLDER_VERT = /* glsl */ `
+  attribute vec3 aPos;
+  attribute vec2 aSize;
+  attribute float aKind;
+  varying vec2 vP;
+  varying vec2 vHalf;
+  varying float vKind;
+  void main() {
+    vHalf = aSize * 0.5;
+    vP = position.xy * (aSize + 0.9);
+    vKind = aKind;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(vec3(vP, 0.0) + aPos, 1.0);
+  }
+`;
+
+const FOLDER_FRAG = /* glsl */ `
+  uniform vec3 uCyan;
+  uniform float uAlpha, uDraw, uThick;
+  varying vec2 vP;
+  varying vec2 vHalf;
+  varying float vKind;
+
+  float rrect(vec2 p, vec2 b, float r) {
+    vec2 q = abs(p) - b + r;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+  }
+  float bar(vec2 p, vec2 c, vec2 h, float r) { return rrect(p - c, h, r); }
+
+  void main() {
+    if (uAlpha < 0.01) discard;
+
+    // The outline draws itself clockwise from the top-left.
+    float ang = atan(vP.y - vHalf.y * 0.0, vP.x);
+    float sweep = clamp((3.14159 - ang) / 6.28318 + 0.25, 0.0, 1.0);
+    float drawn = step(sweep, uDraw + 0.02);
+
+    float d = abs(rrect(vP, vHalf, 0.10)) - uThick;
+    float body = smoothstep(0.012, 0.0, d) * drawn;
+
+    // The tab that makes it read as a folder.
+    float tabD = abs(bar(vP, vec2(-vHalf.x + 0.42, vHalf.y + 0.14), vec2(0.42, 0.14), 0.07)) - uThick;
+    float tab = smoothstep(0.012, 0.0, tabD) * step(0.18, uDraw);
+
+    // Contents: rows for the sheet, a document for the photos.
+    float inner = 0.0;
+    if (vKind < 0.5) {
+      for (int i = 0; i < 4; i++) {
+        float y = vHalf.y * 0.42 - float(i) * 0.28;
+        float w = vHalf.x * (0.62 - mod(float(i), 2.0) * 0.16);
+        inner += smoothstep(0.020, 0.0, abs(rrect(vP - vec2(-vHalf.x * 0.06, y), vec2(w, 0.022), 0.02)));
+      }
+    } else {
+      inner += smoothstep(0.014, 0.0, abs(rrect(vP - vec2(0.0, -0.02), vec2(0.34, 0.60), 0.05)) - 0.012);
+      for (int i = 0; i < 3; i++) {
+        float y = 0.30 - float(i) * 0.22;
+        inner += smoothstep(0.018, 0.0, abs(rrect(vP - vec2(0.0, y), vec2(0.20, 0.018), 0.02)));
+      }
+    }
+    inner *= smoothstep(0.35, 0.75, uDraw);
+
+    float a = clamp(max(max(body, tab), inner * 0.85), 0.0, 1.0) * uAlpha;
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(uCyan, a);
+  }
+`;
+
+function buildFolders() {
+  const base = new PlaneGeometry(1, 1);
+  const g = new InstancedBufferGeometry();
+  g.index = base.index;
+  g.attributes.position = base.attributes.position;
+  g.attributes.uv = base.attributes.uv;
+  g.instanceCount = 2;
+  g.setAttribute("aPos", new InstancedBufferAttribute(
+    new Float32Array([-1.95, 0.15, 0.05,  1.95, 0.15, 0.05]), 3));
+  g.setAttribute("aSize", new InstancedBufferAttribute(
+    new Float32Array([2.60, 1.90,  2.60, 1.90]), 2));
+  g.setAttribute("aKind", new InstancedBufferAttribute(new Float32Array([0, 1]), 1));
+  return g;
+}
 
 /* ---------- the expenses sheet ---------- */
 
@@ -538,7 +612,7 @@ function buildFormations() {
 
 /* Chapter keyframes across global page scroll. */
 const KEYS = [
-  [0.00, "ink"],       [0.72, "twoFolders"], [0.82, "share"],
+  [0.00, "ink"],       [0.60, "ink"],   [0.82, "share"],
   [0.91, "folder"],    [1.00, "folder"],
 ];
 
@@ -588,6 +662,16 @@ export function createStory(canvas) {
   const capture = new Mesh(new PlaneGeometry(W * 2.4, H * 1.5), capMat);
   capture.position.z = 0.06;
   scene.add(capture);
+
+  const folderMat = new ShaderMaterial({
+    vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
+    transparent: true, depthWrite: false,
+    uniforms: { uCyan: { value: CYAN }, uAlpha: { value: 0 },
+                uDraw: { value: 0 }, uThick: { value: 0.012 } },
+  });
+  const folders = new Mesh(buildFolders(), folderMat);
+  folders.frustumCulled = false;
+  scene.add(folders);
 
   const sheetMat = new ShaderMaterial({
     vertexShader: SHEET_VERT, fragmentShader: SHEET_FRAG, transparent: true, depthWrite: false,
@@ -667,7 +751,7 @@ export function createStory(canvas) {
     // The bars are the chart for this stretch; the cloud would only fight it.
     const chartHold = range(p, 0.618, 0.652) * (1 - range(p, 0.772, 0.806));
     dustMat.uniforms.uAlpha.value =
-      range(p, 0.720, 0.780) * (1 - range(p, 0.945, 0.985) * 0.96);
+      range(p, 0.792, 0.836) * (1 - range(p, 0.945, 0.985) * 0.96);
 
     paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
@@ -679,7 +763,7 @@ export function createStory(canvas) {
     // The receipt empties out once its numbers have lifted off, then comes
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
-    const gone = range(p, 0.628, 0.692);
+    const gone = range(p, 0.604, 0.648);
     const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
@@ -715,9 +799,14 @@ export function createStory(canvas) {
     capMat.uniforms.uAlpha.value =
       range(p, 0.326, 0.356) * (1 - range(p, 0.470, 0.512));
 
-    sheet.visible = settle > 0.001 && p < 0.70;
-    sheetMat.uniforms.uAlpha.value = range(p, 0.548, 0.585) * (1 - range(p, 0.628, 0.692));
-    sheetMat.uniforms.uWipeIn.value = ease(range(p, 0.560, 0.645));
+    // Solid folder outlines draw themselves around the two destinations.
+    folderMat.uniforms.uAlpha.value = range(p, 0.566, 0.598) * (1 - range(p, 0.606, 0.642));
+    folderMat.uniforms.uDraw.value = ease(range(p, 0.570, 0.624));
+    folders.visible = folderMat.uniforms.uAlpha.value > 0.005;
+
+    sheet.visible = settle > 0.001 && p < 0.65;
+    sheetMat.uniforms.uAlpha.value = range(p, 0.548, 0.580) * (1 - range(p, 0.606, 0.642));
+    sheetMat.uniforms.uWipeIn.value = ease(range(p, 0.556, 0.612));
     sheet.position.set(-1.95 * settle, 0.30 * settle, -0.05);
     const ss = 0.30 + 0.70 * settle;
     sheet.scale.set(ss, ss, 1);
@@ -737,6 +826,7 @@ export function createStory(canvas) {
       geo.dispose(); dustMat.dispose();
       crowd.geometry.dispose(); crowdMat.dispose();
       capture.geometry.dispose(); capMat.dispose();
+      folders.geometry.dispose(); folderMat.dispose();
       sheet.geometry.dispose(); sheetMat.uniforms.uTex.value.dispose(); sheetMat.dispose();
       renderer.dispose();
     },
