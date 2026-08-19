@@ -47,9 +47,8 @@ const PAPER_VERT = /* glsl */ `
 `;
 
 const PAPER_FRAG = /* glsl */ `
-  uniform float uScan, uFade, uReveal, uShutter, uWipe, uCyanHold, uInvert;
+  uniform float uScan, uFade, uShutter, uWipe, uCyanHold, uInvert, uExtract;
   uniform vec3 uInk, uCyan;
-  uniform sampler2D uTex, uTexDark;
   varying vec2 vUv; varying float vShade;
 
   // A horizontal rule from x0..x1 at height y, half-thickness h.
@@ -63,7 +62,12 @@ const PAPER_FRAG = /* glsl */ `
   }
 
   void main() {
-    vec3 paper = vec3(0.995, 0.995, 0.99) * (1.0 - vShade * 0.85);
+    // Same receipt throughout: only the palette inverts, so the reader keeps
+    // recognising the paper they were just looking at.
+    vec3 stock = mix(vec3(0.995, 0.995, 0.99), vec3(0.052, 0.078, 0.125), uInvert);
+    vec3 inkc  = mix(uInk, vec3(0.93, 0.95, 0.97), uInvert);
+    vec3 cyanc = mix(uCyan, vec3(0.28, 0.86, 0.79), uInvert);
+    vec3 paper = stock * (1.0 - vShade * mix(0.85, 0.45, uInvert));
     float ink = 0.0;
 
     // Merchant name, then two small header lines.
@@ -86,25 +90,22 @@ const PAPER_FRAG = /* glsl */ `
     ink += rule(vUv, 0.310, 0.12, 0.30, 0.0030);   // tax
     ink += rule(vUv, 0.310, 0.84, 0.985, 0.0030);
 
-    vec3 col = mix(paper, uInk, clamp(ink, 0.0, 1.0) * 0.80);
+    vec3 col = mix(paper, inkc, clamp(ink, 0.0, 1.0) * 0.80);
 
     // The total is the one line that carries colour.
     float total = rule(vUv, 0.246, 0.12, 0.40, 0.0090)
                 + rule(vUv, 0.246, 0.74, 0.985, 0.0090);
-    col = mix(col, uCyan, clamp(total, 0.0, 1.0) * 0.95);
+    col = mix(col, cyanc, clamp(total, 0.0, 1.0) * 0.95);
 
     // Barcode.
     float bars = step(0.45, fract(vUv.x * 38.0)) * step(0.115, vUv.y) * step(vUv.y, 0.165)
                * step(0.20, vUv.x) * step(vUv.x, 0.80);
-    col = mix(col, uInk, bars * 0.72);
+    col = mix(col, inkc, bars * 0.72);
 
     // What we actually read off it, once the capture has landed.
-    if (uReveal > 0.001) {
-      // Same receipt, inverted treatment: the reader should still recognise
-      // the paper underneath.
-      vec3 shot = mix(texture2D(uTex, vUv).rgb, texture2D(uTexDark, vUv).rgb, uInvert);
-      col = mix(col, shot * (1.0 - vShade * 0.85), uReveal);
-    }
+    // The two fields Bixt took off it, highlighted where they sit.
+    float ex = rule(vUv, 0.246, 0.10, 0.99, 0.026) + rule(vUv, 0.940, 0.20, 0.80, 0.030);
+    col = mix(col, cyanc, clamp(ex, 0.0, 1.0) * uExtract * 0.55);
 
     if (uScan >= 0.0) {
       float d = abs(vUv.y - (1.0 - uScan));
@@ -282,96 +283,78 @@ const DUST_FRAG = /* glsl */ `
   }
 `;
 
-/* ---------- the read receipt ---------- */
+/* ---------- the expenses sheet ---------- */
 
-/* Once the capture lands, the paper stops being abstract lines and shows what
-   was actually taken off it: vendor, date, line items, subtotal, HST, total.
-   Drawn to a canvas because that is the cheapest way to get real, legible
-   type onto a texture without shipping a font atlas. */
-function makeReceiptTexture(dark) {
-  const w = 440, h = 1180;
+/* The structured half of the receipt: the same transaction, written as a row
+   in a spreadsheet. Drawn dark to match the inverted receipt it comes out of. */
+function makeSheetTexture() {
+  const w = 900, h = 620;
   const cv = document.createElement("canvas");
   cv.width = w; cv.height = h;
   const x = cv.getContext("2d");
+  const BG = "#0d1420", LINE = "#232e3f", INKC = "#eef2f7", MUT = "#8a94a6", CY = "#3fd6c6";
+  const font = (px, wt = "400") => `${wt} ${px}px ui-monospace, "SF Mono", Menlo, monospace`;
 
-  // Same receipt either way: same layout, same lines, same information.
-  // Only the treatment inverts, so the reader still recognises the paper.
-  const PAPER = dark ? "#0d1420" : "#ffffff";
-  const INKC  = dark ? "#eef2f7" : "#111a2d";
-  const MUT   = dark ? "#8a94a6" : "#5c6472";
-  const RULE  = dark ? "#2b3547" : "#c9ced8";
-  const CY    = dark ? "#3fd6c6" : "#00827d";
+  x.fillStyle = BG; x.fillRect(0, 0, w, h);
 
-  x.fillStyle = PAPER; x.fillRect(0, 0, w, h);
-  const mono = (px, weight = "400") => `${weight} ${px}px ui-monospace, "SF Mono", Menlo, monospace`;
-  const L = 46, R = w - 46;
+  const cols = [40, 210, 400, 560, 700, 840];
+  const head = ["Date", "Vendor", "Category", "Total", "HST"];
+  x.font = font(22, "700"); x.fillStyle = MUT;
+  head.forEach((t, i) => { x.textAlign = "left"; x.fillText(t, cols[i], 52); });
 
-  const rule = (y, dashed) => {
-    x.strokeStyle = RULE; x.lineWidth = 2;
-    x.setLineDash(dashed ? [6, 7] : []);
-    x.beginPath(); x.moveTo(L, y); x.lineTo(R, y); x.stroke();
-    x.setLineDash([]);
-  };
-  const row = (y, label, val, o = {}) => {
-    x.fillStyle = o.mut ? MUT : (o.color || INKC);
-    x.font = mono(o.size || 25, o.weight || "400");
-    x.textAlign = "left";  x.fillText(label, L, y);
-    if (val !== undefined) { x.textAlign = "right"; x.fillText(val, R, y); }
-  };
-  // The cyan marks are highlighters: they point at what was read.
-  const mark = (y, x0, x1, hgt) => {
-    x.fillStyle = CY; x.globalAlpha = dark ? 0.22 : 0.16;
-    x.fillRect(x0, y - hgt * 0.78, x1 - x0, hgt);
-    x.globalAlpha = 1;
-  };
-
-  x.textAlign = "center"; x.fillStyle = INKC; x.font = mono(40, "700");
-  x.fillText("ESSO", w / 2, 96);
-  x.fillStyle = MUT; x.font = mono(22);
-  x.fillText("1240 King St W", w / 2, 136);
-  x.fillText("Toronto, ON", w / 2, 168);
-
-  rule(206, true);
-  if (dark) mark(248, L, R, 34);
-  row(248, "12 Aug 2026", "14:32", { mut: !dark, size: 23 });
-  rule(286, true);
-
-  if (dark) mark(340, L, R, 34);
-  row(340, "Unleaded 38.4L", "66.85");
-  row(388, "Car wash", "12.00");
-  row(436, "Coffee", "2.49");
-  row(484, "Wiper fluid", "6.99");
-
-  rule(530, true);
-  row(578, "SUBTOTAL", "$88.33", { mut: true, size: 24 });
-  if (dark) mark(626, L, R, 32);
-  row(626, "HST 13%", "$11.48", { mut: !dark, size: 24 });
-  rule(664, false);
-  if (dark) mark(722, L, R, 46);
-  row(722, "TOTAL", "$99.81", { size: 34, weight: "700", color: CY });
-  rule(766, true);
-
-  x.fillStyle = MUT; x.font = mono(21); x.textAlign = "center";
-  x.fillText("VISA ****4417  ·  CAD", w / 2, 812);
-
-  x.fillStyle = INKC;
-  for (let i = 0, px = 96; px < w - 96; i++, px += 7) {
-    if (i % 3) x.fillRect(px, 880, i % 2 ? 3 : 5, 78);
+  x.strokeStyle = LINE; x.lineWidth = 2;
+  for (let r = 0; r <= 8; r++) {
+    const y = 74 + r * 60;
+    x.beginPath(); x.moveTo(24, y); x.lineTo(w - 24, y); x.stroke();
   }
+  cols.forEach((c) => { x.beginPath(); x.moveTo(c - 16, 24); x.lineTo(c - 16, h - 24); x.stroke(); });
 
-  // What Bixt took off the paper, written back onto it.
-  if (dark) {
-    x.strokeStyle = CY; x.lineWidth = 2;
-    x.beginPath(); x.moveTo(L, 1006); x.lineTo(R, 1006); x.stroke();
-    row(1058, "CATEGORY", "GAS", { size: 26, weight: "700", color: CY });
-    row(1108, "TOTAL", "$99.81", { size: 26, weight: "700", color: CY });
-  }
+  const rows = [
+    ["04 Aug 2026", "Home Depot", "Supplies", "142.11", "16.34"],
+    ["09 Aug 2026", "Tim Hortons", "Meals", "18.75", "2.16"],
+    ["12 Aug 2026", "Esso", "Gas", "99.81", "11.48"],
+    ["15 Aug 2026", "Canadian Tire", "Tools", "77.40", "8.90"],
+    ["21 Aug 2026", "Petro-Canada", "Gas", "88.02", "10.12"],
+  ];
+  rows.forEach((r, i) => {
+    const y = 74 + i * 60, live = i === 2;          // the receipt we just read
+    if (live) {
+      x.fillStyle = CY; x.globalAlpha = 0.16;
+      x.fillRect(24, y + 2, w - 48, 56); x.globalAlpha = 1;
+    }
+    x.font = font(23, live ? "700" : "400");
+    x.fillStyle = live ? CY : INKC;
+    r.forEach((cell, c) => { x.textAlign = "left"; x.fillText(cell, cols[c], y + 40); });
+  });
 
   const t = new CanvasTexture(cv);
-  t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
+  t.colorSpace = SRGBColorSpace; t.anisotropy = 4;
   return t;
 }
+
+const SHEET_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+
+const SHEET_FRAG = /* glsl */ `
+  uniform sampler2D uTex;
+  uniform float uAlpha, uWipeIn;
+  uniform vec3 uCyan;
+  varying vec2 vUv;
+  void main() {
+    if (uAlpha < 0.01) discard;
+    // The sheet writes itself left to right as the data lands in it.
+    float front = uWipeIn;
+    float on = smoothstep(front + 0.05, front - 0.02, vUv.x);
+    if (on < 0.01) discard;
+    vec3 col = texture2D(uTex, vUv).rgb;
+    col += uCyan * smoothstep(0.045, 0.0, abs(vUv.x - front)) * 0.5;
+    float edge = smoothstep(0.0, 0.012, vUv.x) * smoothstep(1.0, 0.988, vUv.x)
+               * smoothstep(0.0, 0.018, vUv.y) * smoothstep(1.0, 0.982, vUv.y);
+    gl_FragColor = vec4(col, uAlpha * on * edge);
+  }
+`;
 
 /* ---------- capture frame ---------- */
 
@@ -555,8 +538,8 @@ function buildFormations() {
 
 /* Chapter keyframes across global page scroll. */
 const KEYS = [
-  [0.00, "ink"],       [0.50, "ink"],   [0.62, "twoFolders"],
-  [0.79, "share"],     [0.89, "folder"], [1.00, "folder"],
+  [0.00, "ink"],       [0.72, "twoFolders"], [0.82, "share"],
+  [0.91, "folder"],    [1.00, "folder"],
 ];
 
 export function createStory(canvas) {
@@ -576,10 +559,8 @@ export function createStory(canvas) {
   const paperMat = new ShaderMaterial({
     vertexShader: PAPER_VERT, fragmentShader: PAPER_FRAG, transparent: true,
     uniforms: { uCrumple: { value: 1 }, uScan: { value: -1 }, uFade: { value: 1 },
-                uReveal: { value: 0 }, uShutter: { value: 0 },
+                uShutter: { value: 0 }, uExtract: { value: 0 },
                 uWipe: { value: 0 }, uCyanHold: { value: 0 }, uInvert: { value: 0 },
-                uTex: { value: makeReceiptTexture(false) },
-                uTexDark: { value: makeReceiptTexture(true) },
                 uInk: { value: INK }, uCyan: { value: CYAN } },
   });
   const paper = new Mesh(new PlaneGeometry(W, H, 48, 64), paperMat);
@@ -607,6 +588,15 @@ export function createStory(canvas) {
   const capture = new Mesh(new PlaneGeometry(W * 2.4, H * 1.5), capMat);
   capture.position.z = 0.06;
   scene.add(capture);
+
+  const sheetMat = new ShaderMaterial({
+    vertexShader: SHEET_VERT, fragmentShader: SHEET_FRAG, transparent: true, depthWrite: false,
+    uniforms: { uTex: { value: makeSheetTexture() }, uAlpha: { value: 0 },
+                uWipeIn: { value: 0 }, uCyan: { value: CYAN } },
+  });
+  const sheet = new Mesh(new PlaneGeometry(3.5, 2.4), sheetMat);
+  sheet.visible = false;
+  scene.add(sheet);
 
   const F = buildFormations();
   const geo = new BufferGeometry();
@@ -654,6 +644,11 @@ export function createStory(canvas) {
 
   /** p is progress through the whole page, 0 at the top, 1 at the bottom. */
   function apply(p) {
+    const ease = (v) => v * v * (3 - 2 * v);
+    // 07: the information separates. The receipt keeps the image and moves
+    // aside; a second copy of it becomes the row in the sheet.
+    const settle = ease(range(p, 0.560, 0.660));
+
     let i = 0;
     while (i < KEYS.length - 2 && p >= KEYS[i + 1][0]) i++;
     setSegment(i);
@@ -672,7 +667,7 @@ export function createStory(canvas) {
     // The bars are the chart for this stretch; the cloud would only fight it.
     const chartHold = range(p, 0.618, 0.652) * (1 - range(p, 0.772, 0.806));
     dustMat.uniforms.uAlpha.value =
-      range(p, 0.545, 0.600) * (1 - range(p, 0.945, 0.985) * 0.96);
+      range(p, 0.720, 0.780) * (1 - range(p, 0.945, 0.985) * 0.96);
 
     paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
     paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
@@ -684,37 +679,52 @@ export function createStory(canvas) {
     // The receipt empties out once its numbers have lifted off, then comes
     // back small inside the folder: the journey ends where it is kept, not in
     // a puff of particles.
-    const gone = range(p, 0.545, 0.635);
+    const gone = range(p, 0.628, 0.692);
     const filed = range(p, 0.88, 0.94);
     // Clear the stage before the call to action so it stands on its own.
     const clear = 1 - range(p, 0.945, 0.985);
     const arrive = range(p, 0.045, 0.10);
     paperMat.uniforms.uFade.value = ((1 - gone * 0.998) + filed * 0.92) * clear * arrive;
-    const sc = 0.84 * (1 - filed * 0.72);
+    const sc = 0.84 * (1 - settle * 0.44) * (1 - filed * 0.55);
     paper.scale.set(sc, sc, 1);
     paper.position.y = -filed * 0.10;
 
     // Edges found, locked, taken. This is what earns the switch to dark.
     // 02 rectangle -> 03 cyan sweeps the paper -> 04 full cyan and a flash
     // -> 05 the same receipt, inverted.
-    const ease = (v) => v * v * (3 - 2 * v);
     paperMat.uniforms.uWipe.value = ease(range(p, 0.432, 0.462));
     paperMat.uniforms.uCyanHold.value = range(p, 0.430, 0.436) * (1 - range(p, 0.478, 0.514));
     paperMat.uniforms.uShutter.value =
       ease(range(p, 0.459, 0.468)) * (1 - ease(range(p, 0.468, 0.488)));
     paperMat.uniforms.uInvert.value = ease(range(p, 0.470, 0.510));
-    paperMat.uniforms.uReveal.value = range(p, 0.420, 0.450);
+    paperMat.uniforms.uExtract.value = range(p, 0.500, 0.545) * (1 - range(p, 0.620, 0.660));
+
     const lock = range(p, 0.352, 0.418);
     const e = lock * lock * (3.0 - 2.0 * lock);
-    const tight = [W * 0.56, H * 0.53];
+    const psc = paper.scale.x;
+    const tight = [(W / 2) * psc * 1.045, (H / 2) * psc * 1.015];
     capMat.uniforms.uHalf.value.set(
       tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.34));
     capMat.uniforms.uLen.value = 0.58 - e * 0.28;
     capMat.uniforms.uFull.value = range(p, 0.408, 0.430);
     capMat.uniforms.uFlash.value =
       range(p, 0.418, 0.430) * (1 - range(p, 0.430, 0.452)) * 0.30;
+    capture.visible = p > 0.30 && p < 0.53;
+    capture.position.x = paper.position.x;
+    capture.position.y = paper.position.y;
     capMat.uniforms.uAlpha.value =
       range(p, 0.326, 0.356) * (1 - range(p, 0.470, 0.512));
+
+    sheet.visible = settle > 0.001 && p < 0.70;
+    sheetMat.uniforms.uAlpha.value = range(p, 0.548, 0.585) * (1 - range(p, 0.628, 0.692));
+    sheetMat.uniforms.uWipeIn.value = ease(range(p, 0.560, 0.645));
+    sheet.position.set(-1.95 * settle, 0.30 * settle, -0.05);
+    const ss = 0.30 + 0.70 * settle;
+    sheet.scale.set(ss, ss, 1);
+
+    // The paper itself becomes the supporting document.
+    paper.position.x = 1.75 * settle;
+    paper.position.y = -0.10 - 0.16 * settle;
 
     camera.position.y = -0.42 - range(p, 0.6, 0.95) * 0.25;
   }
@@ -723,13 +733,11 @@ export function createStory(canvas) {
     resize, apply,
     render() { renderer.render(scene, camera); },
     dispose() {
-      paper.geometry.dispose();
-      paperMat.uniforms.uTex.value.dispose();
-      paperMat.uniforms.uTexDark.value.dispose();
-      paperMat.dispose();
+      paper.geometry.dispose(); paperMat.dispose();
       geo.dispose(); dustMat.dispose();
       crowd.geometry.dispose(); crowdMat.dispose();
       capture.geometry.dispose(); capMat.dispose();
+      sheet.geometry.dispose(); sheetMat.uniforms.uTex.value.dispose(); sheetMat.dispose();
       renderer.dispose();
     },
   };

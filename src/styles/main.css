@@ -16,7 +16,10 @@
   --paper:      oklch(0.97 0.005 260);
   --paper-pure: oklch(1 0 0);
   --rule:       oklch(0.90 0.008 260);
-  --footer-ink: oklch(0.20 0.035 264);   /* never inverts */
+  /* The footer keeps its own palette so it never inverts with the page. */
+  --footer-bg:  oklch(0.145 0.028 264);
+  --footer-fg:  oklch(0.88 0.012 260);
+  --footer-mut: oklch(0.66 0.02 260);
 
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter",
           system-ui, "Helvetica Neue", Arial, sans-serif;
@@ -389,19 +392,27 @@ body {
   width: 10px; height: 6px; border-left: 2px solid var(--cyan-deep);
   border-bottom: 2px solid var(--cyan-deep); rotate: -45deg; }
 
+/* Runway after the last chapter so its copy has finished fading out before
+   the footer scrolls up. Without it the two met mid-fade. */
+.tail { height: 58svh; position: relative; z-index: 1; }
+
 /* ---------- footer ---------- */
 
 .wrap { width: 100%; max-width: 1080px; margin-inline: auto; padding-inline: var(--gutter); }
 
-.footer { position: relative; z-index: 1; background: var(--cyan); color: var(--footer-ink); }
+/* z-index 3 so it occludes the chapter copy, which is position:fixed at
+   z-index 2 and would otherwise keep painting over the footer as it arrives. */
+.footer { position: relative; z-index: 3;
+  background: var(--footer-bg); color: var(--footer-fg);
+  border-top: 2px solid var(--cyan); }
 .footer__in { max-width: 1080px; margin-inline: auto; padding: 22px var(--gutter);
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; }
 .footer__mark { font-weight: 700; font-size: 1rem; letter-spacing: -0.03em; }
 .footer__line { margin: 0; font-weight: 600; font-size: 0.9375rem; }
 .footer__nav { margin-left: auto; display: flex; gap: 20px; }
-.footer__nav a { color: var(--footer-ink); text-decoration: none; font-size: 0.875rem; opacity: 0.82; }
+.footer__nav a { color: var(--footer-fg); text-decoration: none; font-size: 0.875rem; opacity: 0.82; }
 .footer__nav a:hover { opacity: 1; }
-.footer__fine { margin: 0; font-size: 0.8125rem; opacity: 0.7; }
+.footer__fine { margin: 0; font-size: 0.8125rem; color: var(--footer-mut); }
 
 /* ---------- scroll progress ---------- */
 
