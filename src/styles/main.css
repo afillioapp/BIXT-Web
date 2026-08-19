@@ -16,6 +16,8 @@
   --paper:      oklch(0.97 0.005 260);
   --paper-pure: oklch(1 0 0);
   --rule:       oklch(0.90 0.008 260);
+  --footer-bg:  oklch(0.20 0.035 264);
+  --footer-fg:  oklch(0.97 0.005 260);
 
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter",
           system-ui, "Helvetica Neue", Arial, sans-serif;
@@ -236,6 +238,14 @@ body {
 .ch__text--split { display: grid; gap: 40px; align-items: center; }
 @media (min-width: 900px) { .ch__text--split { grid-template-columns: 1fr auto; gap: 72px; } }
 
+.ch__text--cta { display: grid; gap: 44px; align-items: center; }
+@media (min-width: 860px) {
+  .ch__text--cta { grid-template-columns: 1.05fr 1fr; gap: 88px; align-items: center; }
+}
+.cta__act { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+.cta__act .body { max-width: 32ch; }
+.cta__act .btn { margin-top: 4px; }
+
 .donut { position: relative; margin: 0; width: min(260px, 62vw); justify-self: start; }
 
 /* Stacked on a phone this chapter is the tallest thing on the site, so it
@@ -293,12 +303,13 @@ body {
 .nodes__link { width: clamp(48px, 12vw, 140px); height: 2px; background:
   linear-gradient(to right, var(--rule), var(--cyan), var(--rule)); }
 
-.price { margin: 40px 0 32px; font-size: clamp(4rem, 12vw, 8rem); font-weight: 600;
+.price { margin: 28px 0 32px; font-size: clamp(4rem, 12vw, 8rem); font-weight: 600;
   letter-spacing: -0.05em; line-height: 1; }
-.price__cur { font-size: 0.42em; vertical-align: super; margin-right: 4px; }
-.price__per { font-size: 0.16em; font-weight: 500; color: var(--ink-faint); margin-left: 6px; }
+.price__cur { font-size: 0.42em; vertical-align: super; margin-right: 6px; letter-spacing: normal; }
+.price__per { font-size: 0.17em; font-weight: 500; color: var(--ink-faint);
+  margin-left: 10px; letter-spacing: normal; }
 
-.ticks { list-style: none; margin: 0 auto 40px; padding: 0; max-width: 380px;
+.ticks { list-style: none; margin: 0; padding: 0; max-width: 380px;
   text-align: left; display: flex; flex-direction: column; gap: 13px; }
 .ticks li { position: relative; padding-left: 30px; color: var(--ink-soft); font-size: 0.9375rem; }
 .ticks li::before { content: ""; position: absolute; left: 4px; top: 0.5em;
@@ -311,18 +322,10 @@ body {
 .wrap { width: 100%; max-width: 1080px; margin-inline: auto; padding-inline: var(--gutter); }
 .wrap--narrow { max-width: 760px; }
 
-.faq__list { border-top: 1px solid var(--rule); }
-.faq details { border-bottom: 1px solid var(--rule); }
-.faq summary { cursor: pointer; list-style: none; padding: 26px 40px 26px 0; position: relative;
   font-size: clamp(1.0625rem, 1.8vw, 1.25rem); font-weight: 600; letter-spacing: -0.015em; }
-.faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: ""; position: absolute; right: 6px; top: 50%;
   width: 11px; height: 11px; translate: 0 -60%; border-right: 2px solid var(--ink-faint);
   border-bottom: 2px solid var(--ink-faint); rotate: 45deg; transition: rotate 260ms var(--ease); }
-.faq details[open] summary::after { rotate: -135deg; }
-.faq details p { margin: 0 0 26px; max-width: 60ch; color: var(--ink-soft); }
-
-.footer { position: relative; z-index: 1; background: var(--ink); color: var(--paper);
+.footer { position: relative; z-index: 1; background: var(--footer-bg); color: var(--footer-fg);
   padding-block: clamp(72px, 10vh, 120px) 64px; }
 .footer__line { margin: 0 0 56px; font-size: clamp(1.75rem, 4vw, 3rem);
   font-weight: 600; letter-spacing: -0.03em; }

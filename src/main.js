@@ -115,10 +115,10 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   };
   const kick = () => { if (queued || !running) return; queued = true; requestAnimationFrame(loop); };
 
-  // Chapters 05 to 07 run dark, then the page returns to paper for the
-  // call to action.
+  // The page starts on paper and turns dark at the capture, then stays
+  // dark through the call to action and the footer.
   const paintTheme = (sp) =>
-    document.body.classList.toggle("is-dark", sp > 0.445 && sp < 0.845);
+    document.body.classList.toggle("is-dark", sp > 0.445);
   paintTheme(target);
 
   addEventListener("scroll", () => {
