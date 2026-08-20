@@ -130,7 +130,35 @@ body {
     0 44px 92px -34px oklch(0.22 0.04 264 / 0.52),
     0 12px 32px -20px oklch(0.22 0.04 264 / 0.42);
 }
-.phone__shot { display: block; width: 100%; height: auto; border-radius: 38px; }
+/* A scroll-snap track rather than a scripted carousel: it swipes natively on
+   a phone, arrows with the keyboard, and still works if the script never runs. */
+.phone__track {
+  display: flex; overflow-x: auto; border-radius: 38px;
+  scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.phone__track::-webkit-scrollbar { display: none; }
+.phone__track:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+.phone__shot {
+  flex: 0 0 100%; width: 100%; height: auto; display: block;
+  scroll-snap-align: center; scroll-snap-stop: always;
+}
+
+.dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+.dots button {
+  width: 44px; height: 44px; padding: 0; border: 0; background: none;
+  cursor: pointer; display: grid; place-items: center;   /* full target around a 7px dot */
+}
+.dots button::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: color-mix(in oklab, var(--ink) 26%, transparent);
+  transition: background-color 260ms var(--ease), transform 260ms var(--ease);
+}
+.dots button[aria-selected="true"]::before { background: var(--cyan); transform: scale(1.30); }
+.dots button:hover::before { background: color-mix(in oklab, var(--cyan) 62%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+.dots button::before { transition: none; }
+}
 /* The dynamic island, over the dead centre of the status bar. */
 .phone::after {
   content: ""; position: absolute; top: 20px; left: 50%; translate: -50% 0;

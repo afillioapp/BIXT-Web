@@ -282,7 +282,7 @@ const FOLDER_VERT = /* glsl */ `
 
 const FOLDER_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform float uDraw, uThick;
+  uniform float uDraw, uThick, uSpend;
   varying vec2 vP;
   varying vec2 vHalf;
   varying float vKind;
@@ -326,8 +326,9 @@ const FOLDER_FRAG = /* glsl */ `
     // What this one holds, in the same line language: a table of numbers on
     // the left, a photograph on the right. Sits below the flap, which crosses
     // the middle of the body.
-    vec2 ic = vP - vec2(0.0, -h.y * 0.26);
-    float ih = h.y * 0.26, iw = ih * 1.15;
+    float grow = (vKind > 0.5) ? 0.0 : uSpend;
+    vec2 ic = vP - vec2(0.0, -h.y * (0.26 - 0.16 * grow));
+    float ih = h.y * (0.26 + 0.30 * grow), iw = ih * 1.15;
     float icon;
     if (vKind > 0.5) {
       icon = abs(rrect(ic, vec2(iw, ih), 0.05));
@@ -335,10 +336,22 @@ const FOLDER_FRAG = /* glsl */ `
       icon = min(icon, seg(ic, vec2(-iw * 0.05, ih * 0.20), vec2(iw * 0.64, -ih * 0.40)));
       icon = min(icon, abs(length(ic - vec2(iw * 0.40, ih * 0.44)) - ih * 0.15));
     } else {
+      // Expenses: a table of numbers that becomes a picture of the spending.
+      // Pushing a distance past the stroke width is how each half fades, so
+      // the rules dissolve as the columns rise rather than cutting.
       icon = abs(rrect(ic, vec2(iw, ih), 0.04));
-      icon = min(icon, seg(ic, vec2(-iw, ih * 0.34), vec2(iw, ih * 0.34)));
-      icon = min(icon, seg(ic, vec2(-iw, -ih * 0.34), vec2(iw, -ih * 0.34)));
-      icon = min(icon, seg(ic, vec2(0.0, -ih), vec2(0.0, ih)));
+      float rules = min(seg(ic, vec2(-iw, ih * 0.34), vec2(iw, ih * 0.34)),
+                        seg(ic, vec2(-iw, -ih * 0.34), vec2(iw, -ih * 0.34)));
+      rules = min(rules, seg(ic, vec2(0.0, -ih), vec2(0.0, ih)));
+      icon = min(icon, rules + uSpend * 0.17);
+
+      float bw = iw * 0.19;
+      for (int i = 0; i < 3; i++) {
+        float bh = max(0.0015, ih * (0.32 + 0.32 * float(i)) * uSpend);
+        vec2 bc = ic - vec2((float(i) - 1.0) * iw * 0.52, -ih + bh);
+        icon = min(icon, rrect(bc, vec2(bw, bh), min(bw * 0.45, bh))
+                         + (1.0 - uSpend) * 0.17);
+      }
     }
     d = min(d, icon);
 
@@ -543,7 +556,7 @@ export function createStory(canvas) {
     vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
     uniforms: { uCyan: { value: CYAN }, uPhaseA: { value: new Vector4(0, 0, 0, 0) },
-                uDraw: { value: 0 }, uThick: { value: 0.016 } },
+                uDraw: { value: 0 }, uThick: { value: 0.016 }, uSpend: { value: 0 } },
   });
   const folders = new Mesh(buildFolders(), folderMat);
   folders.frustumCulled = false;
@@ -617,14 +630,18 @@ export function createStory(canvas) {
     const arrive = range(p, 0.045, 0.100);
     paperMat.uniforms.uFade.value = (1 - gone * 0.998) * clear * arrive;
     // Meets the folder at whatever size the folder ended up.
-    const sc = 0.84 * (1 - settle * 0.44) * (1 - intoFolder * 0.30)
-             * (1 - intoFolder * (1 - fit));
+    // The narrower the frame, the smaller the receipt has to be to leave the
+    // copy its room: at 375 the column is a third of the designed width.
+    const sc = 0.84 * (0.78 + 0.22 * fit) * (1 - settle * 0.35)
+             * (1 - intoFolder * 0.30) * (1 - intoFolder * (1 - fit));
     paper.scale.set(sc, sc, 1);
 
     // The photograph is what the second folder holds.
     const paperX = 1.75 * fit * settle;
     paper.position.x = paperX + intoFolder * (FOLDER_X - paperX);
-    const paperY = -0.10 - 0.16 * settle;
+    // Rises to the shared centre line as it settles, and is already there by
+    // the time the folder draws around it, so the morph is horizontal only.
+    const paperY = -0.10 + (FOLDER_Y + 0.10) * settle;
     paper.position.y = paperY + intoFolder * (FOLDER_Y - paperY);
 
     // Edges found, locked, taken. This is what earns the switch to dark.
@@ -642,7 +659,7 @@ export function createStory(canvas) {
     const psc = paper.scale.x;
     const tight = [(W / 2) * psc * 1.045, (H / 2) * psc * 1.015];
     capMat.uniforms.uHalf.value.set(
-      tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.34));
+      tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.06));
     capMat.uniforms.uLen.value = 0.58 - e * 0.28;
     capMat.uniforms.uFull.value = range(p, 0.482, 0.502);
     capMat.uniforms.uFlash.value =
@@ -657,11 +674,14 @@ export function createStory(canvas) {
        stay lit; the spending rises between them; the rule runs under both. The
        old version faded the folders out and brought a different set back twice,
        which is what made this stretch read as three unrelated scenes. */
-    const fPair = range(p, 0.618, 0.664) * (1 - range(p, 0.930, 0.958));
+    const fPair = range(p, 0.618, 0.664) * (1 - range(p, 0.880, 0.914));
     // Brought forward now the chart no longer occupies the beat before it.
-    const fLink = range(p, 0.780, 0.836) * (1 - range(p, 0.930, 0.958));
+    const fLink = range(p, 0.780, 0.836) * (1 - range(p, 0.880, 0.914));
     folderMat.uniforms.uPhaseA.value.set(fPair, fLink, 0, 0);
     folderMat.uniforms.uDraw.value = ease(range(p, 0.616, 0.688));
+    // Track your spending: the table inside the Expenses folder turns into a
+    // chart. It is the beat's whole animation, and it keeps the middle clear.
+    folderMat.uniforms.uSpend.value = ease(range(p, 0.742, 0.806));
     folders.visible = Math.max(fPair, fLink) > 0.005;
 
     sheet.visible = settle > 0.001 && p < 0.72;
@@ -676,13 +696,13 @@ export function createStory(canvas) {
     const ss = (0.30 + 0.70 * settle) * (1 - intoFolder * 0.36) * fit;
     const fullW = SHEET_W * ss, w = fullW * wipe;
     sheet.scale.set(w, SHEET_H * ss, 1);
-    const sheetX = -1.95 * fit * settle - (fullW - w) / 2, sheetY = 0.30 * fit * settle;
+    const sheetX = -1.95 * fit * settle - (fullW - w) / 2, sheetY = FOLDER_Y * settle;
     sheet.position.set(
       sheetX + intoFolder * (-FOLDER_X - sheetX),
       sheetY + intoFolder * (FOLDER_Y - sheetY),
       -0.05);
 
-    camera.position.y = -0.42 - range(p, 0.6, 0.95) * 0.25;
+    camera.position.y = -0.62 - range(p, 0.6, 0.95) * 0.05;
   }
 
   return {

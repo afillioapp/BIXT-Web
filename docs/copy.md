@@ -15,15 +15,17 @@ Three places keep the letters BX and must not be "corrected":
 
 - **Never write BX in a sentence.** It is a mark, not a word. Write Bixt.
 - **Real nouns only.** Receipt, folder, spreadsheet, your accountant, April. Never "solution", "platform", "seamless", "effortless", "AI-powered", "streamline", "empower", "unlock".
-- **The outcome is the hero, not the technology.** Claude reads the receipt — say it plainly, once, and move on. What the reader cares about is that the shoebox is gone and their accountant stopped chasing them.
+- **The outcome is the hero, not the technology.** Bixt reads the receipt. Never name the
+  model and never write "AI": the reader cares that the shoebox is gone and that their
+  accountant stopped chasing them, not what is doing the reading.
 - **One idea per section, short declarative sentences.** If a line needs a comma splice to hold two thoughts, it is two lines. Hero headline stays under eight words.
 
 ---
 
 ## Nav
 - Wordmark: **BX**
-- Links: `How it works` · `Pricing` · `Questions`
-- Button: `Get BX`
+- Links: `How it works` · `Pricing`
+- Button: `Get Bixt`
 
 ## Titles — the rule
 
@@ -34,17 +36,39 @@ chapters.
 
 ## The story, in order
 
-| # | Eyebrow | Title | Body |
-|---|---|---|---|
-| — | — | Stop **chasing** receipts. / *Just Bixt it.* | Hero. No buttons: the only call to action is at the end of the story. |
-| 01 | Where it starts | **Receipts** everywhere. | In the van. In a pocket. Never where you need them. |
-| 02 | Snap it | Take a **photo**. | That is the whole job. There is no second part. |
-| 03 | It gets read | **Numbers** come off. | We read them. You check before anything saves. |
-| 04 | It gets filed | Filed by **month**. | Photo and spreadsheet row. Nothing to name. |
-| 05 | A year, handled | **Twelve months**, done. | Carried by the 12 / 1 / 0 stat row. |
-| 06 | How it ends | Your **accountant** sees. | Same folder, read only, always current. Nothing to send. |
-| 07 | Where it ends | **Stored**, not lost. | Back where it belongs. In your folder, in your Drive. |
-| — | Three dollars a month | Three **dollars** monthly. | The call to action. |
+Nine sections, no eyebrows: the titles carry the sequence alone. The reader
+goes problem, then what it costs to start, then the one thing they do, then
+four beats where the system works and they do nothing.
+
+| # | Title | Body |
+|---|---|---|
+| — | Stop **chasing** receipts. | Grab your phone, snap it, done. Or just **Bixt** it. |
+| 1 | **Receipts** everywhere. | In the van. In a pocket. Never where you need them. |
+| 2 | Install the **app**. | One app on the phone you already carry. Nothing else to buy. |
+| 3 | Connect your **Drive**. | Bixt makes the folder. Your accountant gets read only access. |
+| 4 | Take a **photo**. | That is the whole job. There is no second part to remember. |
+| 5 | **Numbers** come off. | Date, vendor, total, tax, straight off the paper. And it was fuel. |
+| 6 | **Two** folders. | One folder holds the spreadsheet row. One holds the photo. |
+| 7 | What **August** cost. | What the month cost, added up while you were out on a job. |
+| 8 | Your **accountant** sees. | Same folder, read only, always up to date. Nothing to email in April. |
+| — | Just **Bixt** it. | Photograph the paper. Bixt reads it, files it and adds it up. Three dollars a month. |
+
+### Two lines, measured
+
+Chapter bodies use `.measure`, which is `30ch` and computes to **321px** at
+1440, 768 and 390 (312px at 360). The band that renders as exactly two lines is
+therefore **about 46 to 88 characters**: under ~45 it collapses to one, over
+~88 it goes to three. The closing body uses `42ch` but is container-limited on
+a phone, so its band is tighter, **66 to 85**. Every line above was measured at
+1440, 768, 390 and 360 rather than counted by eye.
+
+### Two things the copy must never say again
+
+**"send it"** and **"shares it"**. Nothing is ever sent, shared, exported or
+uploaded: the accountant already has read-only access to a folder in the
+owner's own Drive. The hero said "snap it, send it" while chapter 8 closed on
+"Nothing to send", which promised the exact thing the story spends eight beats
+removing.
 
 ## Pricing
 - **Eyebrow:** Pricing
@@ -57,7 +81,7 @@ chapters.
   - One accountant, read-only, always up to date
   - Works on the phone you already have
   - Cancel whenever — the folder stays yours
-- Button: `Get BX`
+- Button: `Get Bixt`
 - Fine print under button: No card required to look around.
 
 ## Social proof
@@ -83,9 +107,9 @@ Yes. It’s a website, so it works in any browser. Most people use their phone b
 ## Footer
 - Closing line: Take a photo. That’s it.
 - Link columns:
-  - Product: `How it works` · `Pricing` · `Questions`
+  - Product: `How it works` · `Pricing`
   - Company: `Privacy` · `Terms` · `Contact`
-- Small print: © 2026 BX. Your receipts stay in your Google Drive.
+- Small print: © 2026 Bixt. Your receipts stay in your Google Drive.
 
 ## Metadata
 - **Title (58 chars):** BX — Receipts filed, and your accountant already has them

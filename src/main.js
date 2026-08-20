@@ -33,6 +33,63 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   document.querySelector(".ch--hero")?.classList.add("is-on");
 }
 
+/* ---------- the app screens ---------- */
+{
+  const track = document.getElementById("shots");
+  const dots = document.getElementById("dots");
+  if (track && dots) {
+    const slides = [...track.querySelectorAll(".phone__shot")];
+    const go = (i) => track.scrollTo({
+      left: track.clientWidth * i,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+
+    slides.forEach((img, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-label", `Screen ${i + 1} of ${slides.length}`);
+      b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      b.addEventListener("click", () => { stop(); go(i); });
+      dots.append(b);
+    });
+    const buttons = [...dots.children];
+    const mark = (i) => buttons.forEach((b, j) =>
+      b.setAttribute("aria-selected", j === i ? "true" : "false"));
+
+    // Which slide is under the middle of the track is the one showing.
+    let raf = 0;
+    track.addEventListener("scroll", () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        mark(Math.round(track.scrollLeft / track.clientWidth));
+      });
+    }, { passive: true });
+
+    /* It advances on its own, but only while it is actually on screen and
+       nobody is touching it, and never for a reader who asked for less
+       motion. */
+    let timer = 0;
+    const stop = () => { clearInterval(timer); timer = 0; };
+    const start = () => {
+      if (timer || reduceMotion) return;
+      timer = setInterval(() => {
+        go((Math.round(track.scrollLeft / track.clientWidth) + 1) % slides.length);
+      }, 4200);
+    };
+    for (const ev of ["pointerenter", "focusin", "pointerdown"]) track.addEventListener(ev, stop);
+    dots.addEventListener("pointerenter", stop);
+    track.addEventListener("pointerleave", start);
+
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()),
+        { threshold: 0.5 }).observe(track);
+    } else start();
+    document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+  }
+}
+
 /* ---------- nav hairline ---------- */
 {
   const nav = document.getElementById("nav");
