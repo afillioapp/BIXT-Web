@@ -568,14 +568,24 @@ export function createStory(canvas) {
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const range = (v, a, b) => clamp01((v - a) / (b - a));
 
+  /* The canvas is the content column, so the frame is narrow and its aspect
+     barely changes with the viewport. Whatever width the frame cannot show at
+     full size, the wide arrangements shrink into: on a phone the folder pair
+     used to run off both edges entirely. */
+  const FOV_T = Math.tan((38 * Math.PI / 180) / 2);
+  const DESIGN_HALF_W = 3.62;          // the folder pair, glow included
+  let fit = 1;
+
   function resize() {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    const narrow = w / h < 0.95;
-    camera.position.z = w / h < 0.8 ? 12.4 : 9.3;
-    camera.position.x = narrow ? 0 : -0.95;
+    // Centred in its own column now, rather than pushed aside to clear copy
+    // that used to sit beside it.
+    camera.position.x = 0;
+    camera.position.z = 9.3;
     camera.updateProjectionMatrix();
+    fit = Math.min(1, (FOV_T * camera.position.z * camera.aspect) / DESIGN_HALF_W);
   }
 
   /** p is progress through the whole page, 0 at the top, 1 at the bottom. */
@@ -588,7 +598,8 @@ export function createStory(canvas) {
     // draw, so the folders are where the objects went rather than a new pair of
     // shapes that replaced them.
     const intoFolder = ease(range(p, 0.622, 0.686));
-    const FOLDER_X = 2.42, FOLDER_Y = 0.10;
+    const FOLDER_X = 2.42 * fit, FOLDER_Y = 0.10 * fit;
+    folders.scale.setScalar(fit);
 
     // The pile arrives with chapter 01 and empties out as the story advances:
     // that thinning is the promise the page is making.
@@ -610,11 +621,14 @@ export function createStory(canvas) {
     const clear = 1 - range(p, 0.945, 0.985);
     const arrive = range(p, 0.045, 0.100);
     paperMat.uniforms.uFade.value = (1 - gone * 0.998) * clear * arrive;
-    const sc = 0.84 * (1 - settle * 0.44) * (1 - intoFolder * 0.30);
+    // Meets the folder at whatever size the folder ended up.
+    const sc = 0.84 * (1 - settle * 0.44) * (1 - intoFolder * 0.30)
+             * (1 - intoFolder * (1 - fit));
     paper.scale.set(sc, sc, 1);
 
     // The photograph is what the second folder holds.
-    paper.position.x = 1.75 * settle + intoFolder * (FOLDER_X - 1.75 * settle);
+    const paperX = 1.75 * fit * settle;
+    paper.position.x = paperX + intoFolder * (FOLDER_X - paperX);
     const paperY = -0.10 - 0.16 * settle;
     paper.position.y = paperY + intoFolder * (FOLDER_Y - paperY);
 
@@ -667,10 +681,10 @@ export function createStory(canvas) {
     sheetTex.repeat.x = wipe;
     // Shrinks as it travels, so it settles into the folder rather than
     // sliding behind it at full size.
-    const ss = (0.30 + 0.70 * settle) * (1 - intoFolder * 0.36);
+    const ss = (0.30 + 0.70 * settle) * (1 - intoFolder * 0.36) * fit;
     const fullW = SHEET_W * ss, w = fullW * wipe;
     sheet.scale.set(w, SHEET_H * ss, 1);
-    const sheetX = -1.95 * settle - (fullW - w) / 2, sheetY = 0.30 * settle;
+    const sheetX = -1.95 * fit * settle - (fullW - w) / 2, sheetY = 0.30 * fit * settle;
     sheet.position.set(
       sheetX + intoFolder * (-FOLDER_X - sheetX),
       sheetY + intoFolder * (FOLDER_Y - sheetY),
