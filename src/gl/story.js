@@ -282,7 +282,7 @@ const FOLDER_VERT = /* glsl */ `
 
 const FOLDER_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform float uDraw, uGrow, uThick;
+  uniform float uDraw, uThick;
   varying vec2 vP;
   varying vec2 vHalf;
   varying float vKind;
@@ -302,17 +302,6 @@ const FOLDER_FRAG = /* glsl */ `
     vec2 h = vHalf;
 
     // The link between the two surfaces is a solid rule, not a folder.
-    if (vKind > 2.5) {
-      float gh = h.y * (0.08 + 0.92 * clamp(uGrow * 1.3, 0.0, 1.0));
-      float d3 = rrect(vP - vec2(0.0, gh - h.y), vec2(h.x, gh), min(h.x, 0.07));
-      float core3 = smoothstep(0.012, 0.0, d3);
-      float glow3 = smoothstep(0.11, 0.0, d3);
-      float a3 = clamp(core3 + glow3 * 0.28, 0.0, 1.0) * vOn;
-      if (a3 < 0.004) discard;
-      gl_FragColor = vec4(uCyan * (1.15 + core3 * 0.9), a3);
-      return;
-    }
-
     if (vKind > 1.5) {
       // Runs itself outward on its own opacity, so it does not need a shared
       // growth value that is already spent by the time this beat arrives.
@@ -334,11 +323,24 @@ const FOLDER_FRAG = /* glsl */ `
     float flap = seg(vP, vec2(-h.x, h.y * 0.18), vec2(h.x, h.y * 0.54));
     d = min(d, flap);
 
-    // A couple of lines of contents, low and left.
-    for (int i = 0; i < 2; i++) {
-      float y = -h.y * (0.18 + float(i) * 0.24);
-      d = min(d, seg(vP, vec2(-h.x * 0.62, y), vec2(-h.x * (0.16 - float(i) * 0.12), y)));
+    // What this one holds, in the same line language: a table of numbers on
+    // the left, a photograph on the right. Sits below the flap, which crosses
+    // the middle of the body.
+    vec2 ic = vP - vec2(0.0, -h.y * 0.26);
+    float ih = h.y * 0.26, iw = ih * 1.15;
+    float icon;
+    if (vKind > 0.5) {
+      icon = abs(rrect(ic, vec2(iw, ih), 0.05));
+      icon = min(icon, seg(ic, vec2(-iw * 0.60, -ih * 0.40), vec2(-iw * 0.05, ih * 0.20)));
+      icon = min(icon, seg(ic, vec2(-iw * 0.05, ih * 0.20), vec2(iw * 0.64, -ih * 0.40)));
+      icon = min(icon, abs(length(ic - vec2(iw * 0.40, ih * 0.44)) - ih * 0.15));
+    } else {
+      icon = abs(rrect(ic, vec2(iw, ih), 0.04));
+      icon = min(icon, seg(ic, vec2(-iw, ih * 0.34), vec2(iw, ih * 0.34)));
+      icon = min(icon, seg(ic, vec2(-iw, -ih * 0.34), vec2(iw, -ih * 0.34)));
+      icon = min(icon, seg(ic, vec2(0.0, -ih), vec2(0.0, ih)));
     }
+    d = min(d, icon);
 
     // Rises from the bottom, the same rule as the bars. The tab sits above the
     // body, so its top normalises to about 1.10 and a plain uDraw threshold
@@ -362,22 +364,15 @@ function buildFolders() {
   g.attributes.uv = base.attributes.uv;
 
   //            x      y     w     h    kind  phase
-  const BASE = -0.62;                      // one shared baseline for the chart
-  const bar = (x, hgt) => [x, BASE + hgt / 2, 0.24, hgt, 3, 1];
   const inst = [
     // The pair. Identical, mirrored, and lit from here to the end: everything
     // that follows happens to these two rather than replacing them.
     [-2.42,  0.10,  2.30, 1.86,  0,  0],   // Expenses, where the sheet goes
-    [ 2.42,  0.10,  2.30, 1.86,  0,  0],   // Supporting Documents, where the photo goes
-
-    // What is inside them, surfacing in the gap between. A bar grows from its
-    // own bottom edge, so the centre has to be offset by half the height or
-    // they each sit on a different line.
-    bar(-0.84, 0.46), bar(-0.42, 1.02), bar(0.00, 0.68), bar(0.42, 1.34), bar(0.84, 0.88),
+    [ 2.42,  0.10,  2.30, 1.86,  1,  0],   // Supporting Documents, where the photo goes
 
     // The hand-off: one rule under both, because the accountant is given the
     // same two folders rather than a copy of them.
-    [ 0.00, -1.16,  7.10, 0.055, 2,  2],
+    [ 0.00, -1.16,  7.10, 0.055, 2,  1],
   ];
   g.instanceCount = inst.length;
   const pos = new Float32Array(inst.length * 3), size = new Float32Array(inst.length * 2);
@@ -548,7 +543,7 @@ export function createStory(canvas) {
     vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
     uniforms: { uCyan: { value: CYAN }, uPhaseA: { value: new Vector4(0, 0, 0, 0) },
-                uDraw: { value: 0 }, uGrow: { value: 0 }, uThick: { value: 0.016 } },
+                uDraw: { value: 0 }, uThick: { value: 0.016 } },
   });
   const folders = new Mesh(buildFolders(), folderMat);
   folders.frustumCulled = false;
@@ -662,15 +657,12 @@ export function createStory(canvas) {
        stay lit; the spending rises between them; the rule runs under both. The
        old version faded the folders out and brought a different set back twice,
        which is what made this stretch read as three unrelated scenes. */
-    const fPair  = range(p, 0.618, 0.664) * (1 - range(p, 0.930, 0.958));
-    const fBars  = range(p, 0.734, 0.782) * (1 - range(p, 0.886, 0.918));
-    const fLink  = range(p, 0.846, 0.892) * (1 - range(p, 0.930, 0.958));
-    folderMat.uniforms.uPhaseA.value.set(fPair, fBars, fLink, 0);
-    // Two growths, because the folders finish drawing long before the chart
-    // starts and a single shared value cannot express both.
+    const fPair = range(p, 0.618, 0.664) * (1 - range(p, 0.930, 0.958));
+    // Brought forward now the chart no longer occupies the beat before it.
+    const fLink = range(p, 0.780, 0.836) * (1 - range(p, 0.930, 0.958));
+    folderMat.uniforms.uPhaseA.value.set(fPair, fLink, 0, 0);
     folderMat.uniforms.uDraw.value = ease(range(p, 0.616, 0.688));
-    folderMat.uniforms.uGrow.value = ease(range(p, 0.730, 0.788));
-    folders.visible = Math.max(fPair, Math.max(fBars, fLink)) > 0.005;
+    folders.visible = Math.max(fPair, fLink) > 0.005;
 
     sheet.visible = settle > 0.001 && p < 0.72;
     sheetMat.opacity = range(p, 0.578, 0.606) * (1 - range(p, 0.640, 0.690));

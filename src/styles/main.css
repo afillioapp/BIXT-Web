@@ -103,7 +103,7 @@ body {
    off the top while its scene is still playing. */
 .ch__text {
   position: fixed; z-index: 2;
-  left: 0; right: 0; top: 62svh; bottom: auto;
+  left: 0; right: 0; top: 73svh; bottom: auto;
   width: 100%; max-width: 1080px; margin-inline: auto;
   padding-inline: var(--gutter);
   opacity: 0; pointer-events: none;
@@ -162,10 +162,6 @@ body {
 .headline { margin: 0; font-size: clamp(1.5rem, 4.5vw, 3.5rem);
   font-weight: 600; letter-spacing: -0.028em; line-height: 1.06; text-wrap: balance; }
 .body { color: var(--ink-soft); margin: 0; }
-
-.eyebrow { margin: 0 0 20px; font-size: 0.8125rem; font-weight: 600;
-  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint);
-  display: flex; align-items: center; }
 
 /* Keyword accent. --cyan-deep (6.21:1) not --cyan (3.14:1): the headline
    shrinks to 24px on a phone, which is right at the large-text boundary. */
@@ -246,7 +242,11 @@ body {
 }
 
 @media (max-width: 859px) {
-  .ch__text { top: 57svh; }
+  .ch__text { top: 70svh; }
+  /* The closing block centres in the viewport, but at the very bottom the
+     footer owns the last ~106px of it, and on a phone the block is tall enough
+     that dead centre put the fine print underneath the footer. */
+  .ch--cta .ch__text { top: 46%; }
 /* Compacted so the CTA can share the one vertical start, instead of
      being the single chapter that begins somewhere else. */
   /* Scoped to the chapter: the base .price and .ticks rules are declared
@@ -256,9 +256,14 @@ body {
   .btn--lg { padding: 15px 32px; }
 }
 
-/* Runway after the last chapter so its copy has finished fading out before
-   the footer scrolls up. Without it the two met mid-fade. */
-.tail { height: 58svh; position: relative; z-index: 1; }
+/* Breathing room between the closing chapter and the footer, and no more.
+   This was 58svh, from when the last chapter's copy had to finish fading
+   before the footer arrived. The call to action is pinned and centred now, and
+   that much runway pushed the page past the point where its own chapter still
+   straddles the viewport midline: the copy switched itself off and left a full
+   screen of nothing above the footer. Keep it under half a viewport less the
+   footer's own height, or that gap comes back. */
+.tail { height: 16svh; position: relative; z-index: 1; }
 
 /* ---------- footer ---------- */
 
