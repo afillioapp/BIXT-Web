@@ -118,33 +118,6 @@ body {
 }
 .ch--hero .ch__text { position: static; opacity: 1; pointer-events: auto; }
 
-/* Three plates, side by side, above the offer. Not a device frame: a phone
-   drawn in CSS is a fussy thing to keep honest at every width, and the screens
-   themselves are what the reader is being shown. */
-.shots {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(10px, 1.5vw, 20px);
-  width: 100%; max-width: 620px; margin: 0 auto clamp(22px, 3.2vh, 36px);
-}
-.shot { margin: 0; }
-.shot img {
-  display: block; width: 100%; height: auto;
-  aspect-ratio: 4 / 5; object-fit: cover; object-position: top;
-  border-radius: 10px; padding: 5px;
-  background: var(--paper-pure); border: 1px solid var(--rule);
-  box-shadow: 0 18px 40px -26px oklch(0.22 0.04 264 / 0.50);
-}
-.shot figcaption {
-  margin-top: 10px; text-align: center;
-  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
-  color: var(--ink-soft);
-}
-/* The same cyan hairline the wordmark carries, tying the plates to the mark. */
-.shot figcaption::after {
-  content: ""; display: block; width: 20px; height: 2px; border-radius: 2px;
-  background: var(--cyan); margin: 8px auto 0;
-}
-
 /* Each chapter fades up as it takes the stage. */
 
 .ch__hint {
@@ -243,13 +216,26 @@ body {
 
 .cta__copy { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
+/* The price is the argument, so it is set like one. Deliberately a soda-can
+   number, which only reads that way if it is big enough to be the first thing
+   after the title. */
+.price {
+  margin: 2px 0 0; font-weight: 600; line-height: 1;
+  font-size: clamp(3.25rem, 10vw, 5.75rem); letter-spacing: -0.05em;
+  display: flex; align-items: baseline;
+}
+.price__cur {
+  font-size: 0.42em; letter-spacing: normal;
+  align-self: flex-start; margin-top: 0.14em; margin-right: 0.04em;
+}
+.price__per {
+  font-size: 0.185em; font-weight: 500; letter-spacing: 0.02em;
+  color: var(--ink-faint); margin-left: 0.5em;
+}
+
 @media (max-width: 859px) {
   .ch__text { top: 70svh; }
   .ch--cta .ch__text { top: 50%; }
-  .shots { gap: 8px; margin-bottom: clamp(16px, 2.6vh, 26px); }
-  .shot img { padding: 3px; border-radius: 7px; }
-  .shot figcaption { margin-top: 7px; font-size: 0.6875rem; letter-spacing: 0.02em; }
-  .shot figcaption::after { width: 15px; margin-top: 5px; }
 /* Compacted so the CTA can share the one vertical start, instead of
      being the single chapter that begins somewhere else. */
   /* Scoped to the chapter: the base .price and .ticks rules are declared
@@ -260,12 +246,10 @@ body {
 }
 
 /* The closing block centres in the viewport, but the footer owns the last
-   stretch of it. On a short viewport, dead centre puts the fine print under the
-   footer, and that is about height, not width: a 360x740 phone fails where a
-   375x812 one is fine. */
+   stretch of it, and that is about height rather than width: a 360x740 phone
+   fails where a 375x812 one is fine. */
 @media (max-height: 780px) {
-  .ch--cta .ch__text { top: 45%; }
-  .shots { margin-bottom: 14px; }
+  .ch--cta .ch__text { top: 46%; }
 }
 
 /* Breathing room between the closing chapter and the footer, and no more.
