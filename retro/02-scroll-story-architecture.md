@@ -35,6 +35,28 @@ Two lessons, and the second matters more:
 - **Do not explain away a rendering anomaly as a platform artifact.** "It is
   probably the software renderer" is the shape of a wrong answer. Prove it.
 
+## Nothing validates your GLSL
+
+Shaders are template strings. The bundler parses none of it, so `npm run build`
+passes with a syntax error in the shader and you find out at runtime, where a
+failed link renders nothing at all.
+
+Two ways I broke it in ten minutes:
+
+- `vec2(a, b, 0.0)` — a three-argument `vec2`. Build clean, shader dead.
+- Replacing a block that happened to contain the `reveal` declaration used four
+  lines below it. Build clean, shader dead.
+
+Cheap guards that would have caught both, run at edit time:
+
+```python
+assert not re.findall(r"vec2\(\s*[^();]*?,[^();]*?,[^();]*?\)", src)   # arity
+for name in ["reveal", "core", "glow", ...]:                            # declared?
+    assert re.search(rf"\b(float|vec2|vec3|uniform float|varying float)\b[^;]*\b{name}\b", frag)
+```
+
+And always read the console after a shader edit: the error names the line.
+
 ## One uniform, one job
 
 `uDraw` ended up driving three unrelated things: the folder outline's reveal,

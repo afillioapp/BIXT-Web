@@ -313,50 +313,68 @@ const FOLDER_FRAG = /* glsl */ `
     }
 
     /* No folder around it any more: what the folder held is the object. Each
-       side fills the same box, and each has its own thing to do as the reader
-       scrolls, because only the left one used to move. */
+       side fills the same box, at the size the receipt itself carries, and each
+       has its own thing to do as the reader scrolls, because only the left one
+       used to move. */
     float d = 1000.0;
 
     if (vKind > 0.5) {
-      // Supporting documents: one photograph, and more stacking up behind it.
-      float iw = h.x * 0.68, ih = h.y * 0.60;
+      // Supporting documents: a photograph, with more stacking up behind it.
+      float iw = h.x * 0.74, ih = h.y * 0.72;
       for (int i = 2; i >= 1; i--) {
         float t = clamp(uStack * 1.55 - float(i - 1) * 0.38, 0.0, 1.0);
-        vec2 off = vec2(iw * 0.17, ih * 0.20) * float(i) * t;
-        d = min(d, abs(rrect(vP - off, vec2(iw, ih), 0.09)) + (1.0 - t) * 0.22);
+        vec2 off = vec2(iw * 0.15, ih * 0.16) * float(i) * t;
+        d = min(d, abs(rrect(vP - off, vec2(iw, ih), 0.10)) + (1.0 - t) * 0.22);
       }
-      d = min(d, abs(rrect(vP, vec2(iw, ih), 0.09)));
-      d = min(d, seg(vP, vec2(-iw * 0.62, -ih * 0.30), vec2(-iw * 0.06, ih * 0.26)));
-      d = min(d, seg(vP, vec2(-iw * 0.06, ih * 0.26), vec2(iw * 0.66, -ih * 0.30)));
-      d = min(d, abs(length(vP - vec2(iw * 0.42, ih * 0.44)) - ih * 0.15));
+      d = min(d, abs(rrect(vP, vec2(iw, ih), 0.10)));
+
+      // A horizon, two peaks behind it and a sun: enough to read as a picture
+      // rather than an abstract mark at this size.
+      d = min(d, seg(vP, vec2(-iw, -ih * 0.26), vec2(iw, -ih * 0.26)));
+      d = min(d, seg(vP, vec2(-iw * 0.68, -ih * 0.26), vec2(-iw * 0.20, ih * 0.26)));
+      d = min(d, seg(vP, vec2(-iw * 0.20,  ih * 0.26), vec2( iw * 0.14, -ih * 0.26)));
+      d = min(d, seg(vP, vec2(-iw * 0.04, -ih * 0.02), vec2( iw * 0.30,  ih * 0.36)));
+      d = min(d, seg(vP, vec2( iw * 0.30,  ih * 0.36), vec2( iw * 0.72, -ih * 0.26)));
+      d = min(d, abs(length(vP - vec2(iw * 0.44, ih * 0.50)) - ih * 0.12));
+
+      // Two lines of caption where a filed photograph carries its date.
+      d = min(d, seg(vP, vec2(-iw * 0.72, -ih * 0.56), vec2( iw * 0.16, -ih * 0.56)));
+      d = min(d, seg(vP, vec2(-iw * 0.72, -ih * 0.76), vec2(-iw * 0.10, -ih * 0.76)));
     } else {
       /* Expenses: a table of numbers that becomes a picture of the spending.
          Pushing a distance past the stroke width is how each half fades, so
          the rules dissolve as the columns rise rather than cutting. */
-      float iw = h.x * 0.78, ih = h.y * 0.66;
-      d = abs(rrect(vP, vec2(iw, ih), 0.10));
+      float iw = h.x * 0.82, ih = h.y * 0.74;
+      d = abs(rrect(vP, vec2(iw, ih), 0.11));
 
-      float rules = seg(vP, vec2(-iw, ih * 0.50), vec2(iw, ih * 0.50));
-      for (int i = 0; i < 2; i++) {
-        float y = ih * (0.12 - float(i) * 0.32);
+      float head = ih * 0.54;
+      float rules = seg(vP, vec2(-iw, head), vec2(iw, head));
+      rules = min(rules, seg(vP, vec2(-iw * 0.22, -ih), vec2(-iw * 0.22, ih)));
+      rules = min(rules, seg(vP, vec2( iw * 0.38, -ih), vec2( iw * 0.38, ih * 0.54)));
+      for (int i = 1; i <= 3; i++) {
+        float y = head - float(i) * (ih * 0.36);
         rules = min(rules, seg(vP, vec2(-iw, y), vec2(iw, y)));
       }
-      rules = min(rules, seg(vP, vec2(iw * 0.08, -ih), vec2(iw * 0.08, ih * 0.50)));
+      // The one row that matters, boxed the way the sheet highlights it.
+      rules = min(rules, abs(rrect(vP - vec2(0.0, head - ih * 0.54),
+                                   vec2(iw * 0.97, ih * 0.17), 0.03)));
       d = min(d, rules + uSpend * 0.22);
 
-      float bw = iw * 0.12;
+      // and the chart it becomes, on a baseline of its own
+      float base = -ih * 0.82;
+      d = min(d, seg(vP, vec2(-iw * 0.94, base), vec2(iw * 0.94, base))
+                 + (1.0 - uSpend) * 0.22);
+      float bw = iw * 0.11;
       for (int i = 0; i < 4; i++) {
-        float bh = max(0.0015, ih * (0.26 + 0.19 * float(i)) * uSpend);
-        vec2 bc = vP - vec2((float(i) - 1.5) * iw * 0.42, -ih * 0.84 + bh);
+        float bh = max(0.0015, ih * (0.30 + 0.21 * float(i)) * uSpend);
+        vec2 bc = vP - vec2((float(i) - 1.5) * iw * 0.44, base + bh);
         d = min(d, rrect(bc, vec2(bw, bh), min(bw * 0.45, bh))
                    + (1.0 - uSpend) * 0.22);
       }
     }
 
-    // Rises from the bottom, the same rule as the bars. The tab sits above the
-    // body, so its top normalises to about 1.10 and a plain uDraw threshold
-    // sliced it flat; the headroom takes the sweep past the whole silhouette.
-    float reveal = step((vP.y + h.y) / (2.0 * h.y), uDraw * 1.22 + 0.02);
+    // Rises from the bottom, the same rule the whole page moves by.
+    float reveal = step((vP.y + h.y) / (2.0 * h.y), uDraw * 1.15 + 0.02);
 
     // Neon: a bright core inside a soft halo.
     float core = smoothstep(uThick, 0.0, d);
@@ -378,8 +396,8 @@ function buildFolders() {
   const inst = [
     // The pair. Identical, mirrored, and lit from here to the end: everything
     // that follows happens to these two rather than replacing them.
-    [-2.42,  0.10,  2.30, 1.86,  0,  0],   // Expenses, where the sheet goes
-    [ 2.42,  0.10,  2.30, 1.86,  1,  0],   // Supporting Documents, where the photo goes
+    [-2.42,  0.10,  2.86, 2.32,  0,  0],   // Expenses, where the sheet goes
+    [ 2.42,  0.10,  2.86, 2.32,  1,  0],   // Supporting Documents, where the photo goes
 
     // The hand-off: one rule under both, because the accountant is given the
     // same two folders rather than a copy of them.
@@ -579,7 +597,7 @@ export function createStory(canvas) {
      full size, the wide arrangements shrink into: on a phone the folder pair
      used to run off both edges entirely. */
   const FOV_T = Math.tan((38 * Math.PI / 180) / 2);
-  const DESIGN_HALF_W = 3.95;          // the folder pair, glow included, plus a margin
+  const DESIGN_HALF_W = 4.05;          // the pair at its new size, glow included
   let fit = 1;
 
   function resize() {

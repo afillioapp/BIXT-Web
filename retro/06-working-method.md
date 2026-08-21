@@ -22,6 +22,25 @@ substitutions matched.
 Whitespace is the usual cause of a failed match. Print the real text and copy
 from it rather than retyping.
 
+## An assertion must bound the region, not just confirm membership
+
+Removing a block by start and end marker, I asserted the removed text
+*contained* the rules I meant to delete. It did. It also contained 133 other
+lines: every type and button rule in the file. The page still built, and the
+symptom was a button rendering at 60x27, smaller than its own padding.
+
+Membership is not enough. State what must **not** be in the region too:
+
+```python
+def cut(start, end, must_contain, must_not_contain):
+    region = s[s.index(start):s.index(end, s.index(start))]
+    for t in must_contain:     assert t in region
+    for t in must_not_contain: assert t not in region   # the half I was missing
+```
+
+The second list is what catches a marker that matched further down the file
+than you thought. It caught it on the retry, immediately.
+
 ## Never edit by offsets you have not just verified
 
 A backwards slice (`s[:start] + s[end:]` with `end < start`) mangled a 900-line

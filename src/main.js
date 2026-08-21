@@ -33,68 +33,6 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   document.querySelector(".ch--hero")?.classList.add("is-on");
 }
 
-/* ---------- the app screens ---------- */
-{
-  const track = document.getElementById("shots");
-  const dots = document.getElementById("dots");
-  if (track && dots) {
-    const slides = [...track.querySelectorAll(".phone__shot")];
-    // Hidden below 700px, where clientWidth is 0 and every index here would
-    // divide by it.
-    const usable = () => track.clientWidth > 0;
-    const go = (i) => {
-      if (!usable()) return;
-      track.scrollTo({ left: track.clientWidth * i, behavior: reduceMotion ? "auto" : "smooth" });
-    };
-
-    slides.forEach((img, i) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.setAttribute("aria-label", `Screen ${i + 1} of ${slides.length}`);
-      b.setAttribute("aria-current", i === 0 ? "true" : "false");
-      b.addEventListener("click", () => { stop(); go(i); });
-      dots.append(b);
-    });
-    const buttons = [...dots.children];
-    const mark = (i) => buttons.forEach((b, j) =>
-      b.setAttribute("aria-current", j === i ? "true" : "false"));
-
-    // Which slide is under the middle of the track is the one showing.
-    let raf = 0;
-    track.addEventListener("scroll", () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        if (usable()) mark(Math.round(track.scrollLeft / track.clientWidth));
-      });
-    }, { passive: true });
-
-    /* It advances on its own, but only while it is actually on screen and
-       nobody is touching it, and never for a reader who asked for less
-       motion. */
-    let timer = 0;
-    const stop = () => { clearInterval(timer); timer = 0; };
-    const start = () => {
-      if (timer || reduceMotion || !usable()) return;
-      timer = setInterval(() => {
-        go((Math.round(track.scrollLeft / track.clientWidth) + 1) % slides.length);
-      }, 4200);
-    };
-    for (const ev of ["pointerenter", "focusin", "pointerdown"]) track.addEventListener(ev, stop);
-    dots.addEventListener("pointerenter", stop);
-    track.addEventListener("pointerleave", start);
-    dots.addEventListener("pointerleave", start);
-    track.addEventListener("focusout", start);
-
-    const chapter = track.closest(".ch");
-    if ("IntersectionObserver" in window) {
-      new IntersectionObserver(() => (chapter.classList.contains("is-on") ? start() : stop()),
-        { rootMargin: "-50% 0px -50% 0px" }).observe(chapter);
-    } else start();
-    document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
-  }
-}
-
 /* ---------- the story ---------- */
 (async function story() {
   const bar = document.getElementById("bar");

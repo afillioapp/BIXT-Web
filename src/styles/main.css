@@ -118,54 +118,32 @@ body {
 }
 .ch--hero .ch__text { position: static; opacity: 1; pointer-events: auto; }
 
-/* The device is drawn rather than shipped as a PNG, so it inherits the page's
-   own shadow language instead of a stock mockup's. */
-.phone {
-  position: relative; border-radius: 46px; padding: 9px;
-  background: linear-gradient(158deg,
-    oklch(0.40 0.018 264), oklch(0.17 0.028 264) 44%, oklch(0.31 0.02 264));
-  box-shadow:
-    0 0 0 1px oklch(0.22 0.04 264 / 0.30),
-    0 44px 92px -34px oklch(0.22 0.04 264 / 0.52),
-    0 12px 32px -20px oklch(0.22 0.04 264 / 0.42);
+/* Three plates, side by side, above the offer. Not a device frame: a phone
+   drawn in CSS is a fussy thing to keep honest at every width, and the screens
+   themselves are what the reader is being shown. */
+.shots {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.5vw, 20px);
+  width: 100%; max-width: 620px; margin: 0 auto clamp(22px, 3.2vh, 36px);
 }
-/* A scroll-snap track rather than a scripted carousel: it swipes natively on
-   a phone, arrows with the keyboard, and still works if the script never runs. */
-.phone__track {
-  display: flex; overflow-x: auto; border-radius: 38px;
-  scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
-  scrollbar-width: none; -ms-overflow-style: none;
+.shot { margin: 0; }
+.shot img {
+  display: block; width: 100%; height: auto;
+  aspect-ratio: 4 / 5; object-fit: cover; object-position: top;
+  border-radius: 10px; padding: 5px;
+  background: var(--paper-pure); border: 1px solid var(--rule);
+  box-shadow: 0 18px 40px -26px oklch(0.22 0.04 264 / 0.50);
 }
-.phone__track::-webkit-scrollbar { display: none; }
-.phone__track:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
-.phone__shot {
-  flex: 0 0 100%; width: 100%; height: auto; display: block;
-  aspect-ratio: 590 / 1280;                      /* hold the height before decode */
-  scroll-snap-align: center; scroll-snap-stop: always;
+.shot figcaption {
+  margin-top: 10px; text-align: center;
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--ink-soft);
 }
-
-.dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
-.dots button {
-  width: 44px; height: 44px; padding: 0; border: 0; background: none;
-  cursor: pointer; display: grid; place-items: center;   /* full target around a 7px dot */
+/* The same cyan hairline the wordmark carries, tying the plates to the mark. */
+.shot figcaption::after {
+  content: ""; display: block; width: 20px; height: 2px; border-radius: 2px;
+  background: var(--cyan); margin: 8px auto 0;
 }
-.dots button::before {
-  content: ""; width: 7px; height: 7px; border-radius: 50%;
-  background: color-mix(in oklab, var(--ink) 26%, transparent);
-  transition: background-color 260ms var(--ease), transform 260ms var(--ease);
-}
-.dots button[aria-current="true"]::before { background: var(--cyan); transform: scale(1.30); }
-.dots button:hover::before { background: color-mix(in oklab, var(--cyan) 62%, transparent); }
-@media (prefers-reduced-motion: reduce) {
-.dots button::before { transition: none; }
-}
-/* The dynamic island, over the dead centre of the status bar. */
-.phone::after {
-  content: ""; position: absolute; top: 20px; left: 50%; translate: -50% 0;
-  width: 31%; height: 21px; border-radius: 999px;
-  background: oklch(0.11 0.02 264);
-}
-.ch__text--hero > * + * { margin-top: clamp(20px, 3.4vh, 44px); }
 
 /* Each chapter fades up as it takes the stage. */
 
@@ -255,7 +233,6 @@ body {
 .nav .btn { margin-left: auto; }
 }
 
-/* Categories: the recognised one lights up, the rest stay quiet. */
 .cats { list-style: none; display: flex; flex-wrap: wrap; gap: 9px; margin: 28px 0 0; padding: 0; }
 
 .ch--cta .ch__text { top: 50%; translate: 0 -50%; }
@@ -264,37 +241,15 @@ body {
 .ch__text--cta .measure { max-width: 42ch; }
 .ch__text--cta .btn { margin-top: 6px; }
 
-/* The offer and the thing itself, side by side: the last frame shows the app
-   the whole story has been describing. Stacks with the phone under the CTA. */
-.cta { display: grid; gap: clamp(26px, 4vw, 64px); align-items: center; justify-items: center; }
 .cta__copy { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.cta__phone { width: min(186px, 42vw); }
-@media (min-width: 900px) {
-.cta { grid-template-columns: minmax(0, 1fr) auto; justify-items: start; text-align: left; }
-.cta__copy { align-items: flex-start; }
-.cta__phone { width: min(258px, 23vw); }
-.ch__text--cta { text-align: left; }
-}
 
 @media (max-width: 859px) {
   .ch__text { top: 70svh; }
-  /* The closing block centres in the viewport, but at the very bottom the
-     footer owns the last ~106px of it, so on a tablet the device comes down to
-     size to keep the fine print clear of it. */
-  .ch--cta .ch__text { top: 44%; }
-  .cta__phone { width: min(150px, 36vw); }
-  .cta { gap: 20px; }
-  .dots { margin-top: 8px; }
-}
-
-/* On a phone the device goes entirely. A sideways scroll-snap track inside a
-   vertical story fights the reader's thumb, and the block was tall enough that
-   the offer and the button had to compete with it for the fold. What is left
-   is the offer, the button and the fine print, centred. */
-@media (max-width: 700px) {
-  .cta__phone, .dots { display: none; }
   .ch--cta .ch__text { top: 50%; }
-  .cta { gap: 0; }
+  .shots { gap: 8px; margin-bottom: clamp(16px, 2.6vh, 26px); }
+  .shot img { padding: 3px; border-radius: 7px; }
+  .shot figcaption { margin-top: 7px; font-size: 0.6875rem; letter-spacing: 0.02em; }
+  .shot figcaption::after { width: 15px; margin-top: 5px; }
 /* Compacted so the CTA can share the one vertical start, instead of
      being the single chapter that begins somewhere else. */
   /* Scoped to the chapter: the base .price and .ticks rules are declared
@@ -302,6 +257,15 @@ body {
   .ch--cta .price { margin: 8px 0 12px; font-size: clamp(2.25rem, 13.5vw, 3.25rem); }
   .ch__text--cta { gap: 12px; }
   .btn--lg { padding: 15px 32px; }
+}
+
+/* The closing block centres in the viewport, but the footer owns the last
+   stretch of it. On a short viewport, dead centre puts the fine print under the
+   footer, and that is about height, not width: a 360x740 phone fails where a
+   375x812 one is fine. */
+@media (max-height: 780px) {
+  .ch--cta .ch__text { top: 45%; }
+  .shots { margin-bottom: 14px; }
 }
 
 /* Breathing room between the closing chapter and the footer, and no more.
