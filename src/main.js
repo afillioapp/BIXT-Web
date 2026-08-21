@@ -39,10 +39,13 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const dots = document.getElementById("dots");
   if (track && dots) {
     const slides = [...track.querySelectorAll(".phone__shot")];
-    const go = (i) => track.scrollTo({
-      left: track.clientWidth * i,
-      behavior: reduceMotion ? "auto" : "smooth",
-    });
+    // Hidden below 700px, where clientWidth is 0 and every index here would
+    // divide by it.
+    const usable = () => track.clientWidth > 0;
+    const go = (i) => {
+      if (!usable()) return;
+      track.scrollTo({ left: track.clientWidth * i, behavior: reduceMotion ? "auto" : "smooth" });
+    };
 
     slides.forEach((img, i) => {
       const b = document.createElement("button");
@@ -62,7 +65,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        mark(Math.round(track.scrollLeft / track.clientWidth));
+        if (usable()) mark(Math.round(track.scrollLeft / track.clientWidth));
       });
     }, { passive: true });
 
@@ -72,7 +75,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
     let timer = 0;
     const stop = () => { clearInterval(timer); timer = 0; };
     const start = () => {
-      if (timer || reduceMotion) return;
+      if (timer || reduceMotion || !usable()) return;
       timer = setInterval(() => {
         go((Math.round(track.scrollLeft / track.clientWidth) + 1) % slides.length);
       }, 4200);
@@ -179,8 +182,8 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
      which is the reason the palette is written in it. --footer-* are absent on
      purpose: the footer never inverts. */
   const THEME = {
-    "--paper":      [[0.970, 0.005, 260, 1], [0.205, 0.035, 264, 1]],
-    "--paper-pure": [[1.000, 0.000, 0,   1], [0.260, 0.035, 264, 1]],
+    "--paper":      [[0.945, 0.005, 265, 1], [0.205, 0.035, 264, 1]],
+    "--paper-pure": [[0.985, 0.003, 265, 1], [0.260, 0.035, 264, 1]],
     "--ink":        [[0.220, 0.040, 264, 1], [0.970, 0.005, 260, 1]],
     "--ink-soft":   [[0.420, 0.030, 264, 1], [0.800, 0.015, 260, 1]],
     "--ink-faint":  [[0.505, 0.022, 264, 1], [0.685, 0.020, 260, 1]],
@@ -213,7 +216,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
        better reading of the moment. Anywhere contrast is unacceptable the veil
        has taken the text below 0.15, so it reads as absent rather than as
        something you ought to be able to read. */
-    const veil = 1 - smooth(mix / 0.06) * (1 - smooth((mix - 0.88) / 0.09));
+    const veil = 1 - smooth(mix / 0.034) * (1 - smooth((mix - 0.88) / 0.08));
     bodyStyle.setProperty("--veil", veil.toFixed(4));
     for (const key in THEME) {
       const [a, b] = THEME[key];

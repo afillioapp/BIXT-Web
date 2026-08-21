@@ -64,7 +64,7 @@ const PAPER_FRAG = /* glsl */ `
   void main() {
     // Same receipt throughout: only the palette inverts, so the reader keeps
     // recognising the paper they were just looking at.
-    vec3 stock = mix(vec3(0.995, 0.995, 0.99), vec3(0.052, 0.078, 0.125), uInvert);
+    vec3 stock = mix(vec3(0.972, 0.974, 0.968), vec3(0.052, 0.078, 0.125), uInvert);
     vec3 inkc  = mix(uInk, vec3(0.93, 0.95, 0.97), uInvert);
     vec3 cyanc = mix(uCyan, vec3(0.28, 0.86, 0.79), uInvert);
     vec3 paper = stock * (1.0 - vShade * mix(0.85, 0.45, uInvert));
@@ -282,7 +282,7 @@ const FOLDER_VERT = /* glsl */ `
 
 const FOLDER_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform float uDraw, uThick, uSpend;
+  uniform float uDraw, uThick, uSpend, uStack;
   varying vec2 vP;
   varying vec2 vHalf;
   varying float vKind;
@@ -312,51 +312,46 @@ const FOLDER_FRAG = /* glsl */ `
       return;
     }
 
-    /* One continuous silhouette. The shape before this outlined the body and
-       the tab separately, so their edges crossed and doubled where they met,
-       and laid a diagonal right across the middle that read as a slash rather
-       than a flap. Taking abs() of the union draws the merged outline instead,
-       which is what a folder actually looks like. */
-    float body = rrect(vP - vec2(0.0, -h.y * 0.11), vec2(h.x, h.y * 0.72), 0.14);
-    float tab  = rrect(vP - vec2(-h.x + h.x * 0.34, h.y * 0.56),
-                       vec2(h.x * 0.34, h.y * 0.17), 0.10);
-    float d = abs(min(body, tab));
+    /* No folder around it any more: what the folder held is the object. Each
+       side fills the same box, and each has its own thing to do as the reader
+       scrolls, because only the left one used to move. */
+    float d = 1000.0;
 
-    // The front panel sits a little below the back edge, inset at both ends so
-    // it reads as the near side of the folder rather than a rule through it.
-    d = min(d, seg(vP, vec2(-h.x * 0.88, h.y * 0.22), vec2(h.x * 0.88, h.y * 0.22)));
-
-    // What this one holds: a table of numbers on the left, a photograph on
-    // the right. It grows for the spending beat, but stays under the panel
-    // line, which is what caps how far it can go.
-    float grow = (vKind > 0.5) ? 0.0 : uSpend;
-    vec2 ic = vP - vec2(0.0, -h.y * (0.26 - 0.04 * grow));
-    float ih = h.y * (0.26 + 0.19 * grow), iw = ih * 1.15;
-    float icon;
     if (vKind > 0.5) {
-      icon = abs(rrect(ic, vec2(iw, ih), 0.05));
-      icon = min(icon, seg(ic, vec2(-iw * 0.60, -ih * 0.40), vec2(-iw * 0.05, ih * 0.20)));
-      icon = min(icon, seg(ic, vec2(-iw * 0.05, ih * 0.20), vec2(iw * 0.64, -ih * 0.40)));
-      icon = min(icon, abs(length(ic - vec2(iw * 0.40, ih * 0.44)) - ih * 0.15));
+      // Supporting documents: one photograph, and more stacking up behind it.
+      float iw = h.x * 0.68, ih = h.y * 0.60;
+      for (int i = 2; i >= 1; i--) {
+        float t = clamp(uStack * 1.55 - float(i - 1) * 0.38, 0.0, 1.0);
+        vec2 off = vec2(iw * 0.17, ih * 0.20) * float(i) * t;
+        d = min(d, abs(rrect(vP - off, vec2(iw, ih), 0.09)) + (1.0 - t) * 0.22);
+      }
+      d = min(d, abs(rrect(vP, vec2(iw, ih), 0.09)));
+      d = min(d, seg(vP, vec2(-iw * 0.62, -ih * 0.30), vec2(-iw * 0.06, ih * 0.26)));
+      d = min(d, seg(vP, vec2(-iw * 0.06, ih * 0.26), vec2(iw * 0.66, -ih * 0.30)));
+      d = min(d, abs(length(vP - vec2(iw * 0.42, ih * 0.44)) - ih * 0.15));
     } else {
-      // Expenses: a table of numbers that becomes a picture of the spending.
-      // Pushing a distance past the stroke width is how each half fades, so
-      // the rules dissolve as the columns rise rather than cutting.
-      icon = abs(rrect(ic, vec2(iw, ih), 0.04));
-      float rules = min(seg(ic, vec2(-iw, ih * 0.34), vec2(iw, ih * 0.34)),
-                        seg(ic, vec2(-iw, -ih * 0.34), vec2(iw, -ih * 0.34)));
-      rules = min(rules, seg(ic, vec2(0.0, -ih), vec2(0.0, ih)));
-      icon = min(icon, rules + uSpend * 0.17);
+      /* Expenses: a table of numbers that becomes a picture of the spending.
+         Pushing a distance past the stroke width is how each half fades, so
+         the rules dissolve as the columns rise rather than cutting. */
+      float iw = h.x * 0.78, ih = h.y * 0.66;
+      d = abs(rrect(vP, vec2(iw, ih), 0.10));
 
-      float bw = iw * 0.19;
-      for (int i = 0; i < 3; i++) {
-        float bh = max(0.0015, ih * (0.32 + 0.32 * float(i)) * uSpend);
-        vec2 bc = ic - vec2((float(i) - 1.0) * iw * 0.52, -ih + bh);
-        icon = min(icon, rrect(bc, vec2(bw, bh), min(bw * 0.45, bh))
-                         + (1.0 - uSpend) * 0.17);
+      float rules = seg(vP, vec2(-iw, ih * 0.50), vec2(iw, ih * 0.50));
+      for (int i = 0; i < 2; i++) {
+        float y = ih * (0.12 - float(i) * 0.32);
+        rules = min(rules, seg(vP, vec2(-iw, y), vec2(iw, y)));
+      }
+      rules = min(rules, seg(vP, vec2(iw * 0.08, -ih), vec2(iw * 0.08, ih * 0.50)));
+      d = min(d, rules + uSpend * 0.22);
+
+      float bw = iw * 0.12;
+      for (int i = 0; i < 4; i++) {
+        float bh = max(0.0015, ih * (0.26 + 0.19 * float(i)) * uSpend);
+        vec2 bc = vP - vec2((float(i) - 1.5) * iw * 0.42, -ih * 0.84 + bh);
+        d = min(d, rrect(bc, vec2(bw, bh), min(bw * 0.45, bh))
+                   + (1.0 - uSpend) * 0.22);
       }
     }
-    d = min(d, icon);
 
     // Rises from the bottom, the same rule as the bars. The tab sits above the
     // body, so its top normalises to about 1.10 and a plain uDraw threshold
@@ -559,7 +554,7 @@ export function createStory(canvas) {
     vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
     uniforms: { uCyan: { value: CYAN }, uPhaseA: { value: new Vector4(0, 0, 0, 0) },
-                uDraw: { value: 0 }, uThick: { value: 0.016 }, uSpend: { value: 0 } },
+                uDraw: { value: 0 }, uThick: { value: 0.016 }, uSpend: { value: 0 }, uStack: { value: 0 } },
   });
   const folders = new Mesh(buildFolders(), folderMat);
   folders.frustumCulled = false;
@@ -685,6 +680,9 @@ export function createStory(canvas) {
     // Track your spending: the table inside the Expenses folder turns into a
     // chart. It is the beat's whole animation, and it keeps the middle clear.
     folderMat.uniforms.uSpend.value = ease(range(p, 0.742, 0.806));
+    // The photographs stack a little ahead of the chart, so the two sides
+    // stagger rather than moving as one block.
+    folderMat.uniforms.uStack.value = ease(range(p, 0.700, 0.784));
     folders.visible = Math.max(fPair, fLink) > 0.005;
 
     sheet.visible = settle > 0.001 && p < 0.72;
