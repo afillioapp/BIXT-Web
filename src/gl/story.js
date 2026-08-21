@@ -581,7 +581,7 @@ export function createStory(canvas) {
      full size, the wide arrangements shrink into: on a phone the folder pair
      used to run off both edges entirely. */
   const FOV_T = Math.tan((38 * Math.PI / 180) / 2);
-  const DESIGN_HALF_W = 3.62;          // the folder pair, glow included
+  const DESIGN_HALF_W = 3.95;          // the folder pair, glow included, plus a margin
   let fit = 1;
 
   function resize() {
@@ -651,7 +651,7 @@ export function createStory(canvas) {
     paperMat.uniforms.uCyanHold.value = range(p, 0.498, 0.504) * (1 - range(p, 0.540, 0.574));
     paperMat.uniforms.uShutter.value =
       ease(range(p, 0.520, 0.531)) * (1 - ease(range(p, 0.531, 0.554)));
-    paperMat.uniforms.uInvert.value = ease(range(p, 0.532, 0.568));
+    paperMat.uniforms.uInvert.value = ease(range(p, 0.520, 0.580));
     paperMat.uniforms.uExtract.value = range(p, 0.556, 0.596) * (1 - range(p, 0.638, 0.672));
 
     const lock = range(p, 0.440, 0.486);
@@ -702,7 +702,8 @@ export function createStory(canvas) {
       sheetY + intoFolder * (FOLDER_Y - sheetY),
       -0.05);
 
-    camera.position.y = -0.62 - range(p, 0.6, 0.95) * 0.05;
+    camera.position.y = -0.70 + range(p, 0.600, 0.664) * 0.88
+                              - range(p, 0.6, 0.95) * 0.05;
   }
 
   return {

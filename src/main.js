@@ -47,15 +47,14 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
     slides.forEach((img, i) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.setAttribute("role", "tab");
       b.setAttribute("aria-label", `Screen ${i + 1} of ${slides.length}`);
-      b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      b.setAttribute("aria-current", i === 0 ? "true" : "false");
       b.addEventListener("click", () => { stop(); go(i); });
       dots.append(b);
     });
     const buttons = [...dots.children];
     const mark = (i) => buttons.forEach((b, j) =>
-      b.setAttribute("aria-selected", j === i ? "true" : "false"));
+      b.setAttribute("aria-current", j === i ? "true" : "false"));
 
     // Which slide is under the middle of the track is the one showing.
     let raf = 0;
@@ -81,27 +80,21 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
     for (const ev of ["pointerenter", "focusin", "pointerdown"]) track.addEventListener(ev, stop);
     dots.addEventListener("pointerenter", stop);
     track.addEventListener("pointerleave", start);
+    dots.addEventListener("pointerleave", start);
+    track.addEventListener("focusout", start);
 
+    const chapter = track.closest(".ch");
     if ("IntersectionObserver" in window) {
-      new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()),
-        { threshold: 0.5 }).observe(track);
+      new IntersectionObserver(() => (chapter.classList.contains("is-on") ? start() : stop()),
+        { rootMargin: "-50% 0px -50% 0px" }).observe(chapter);
     } else start();
     document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
   }
 }
 
-/* ---------- nav hairline ---------- */
-{
-  const nav = document.getElementById("nav");
-  const on = () => nav.classList.toggle("is-stuck", window.scrollY > 40);
-  on();
-  addEventListener("scroll", on, { passive: true });
-}
-
 /* ---------- the story ---------- */
 (async function story() {
   const bar = document.getElementById("bar");
-  const progressEl = document.getElementById("progress");
   const storyEl = document.getElementById("story");
   const canvas = document.getElementById("gl");
   const poster = document.getElementById("poster");
@@ -119,10 +112,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
     return travel > 0 ? clamp01(-r.top / travel) : 0;
   };
 
-  const paintBar = (p) => {
-    bar.style.transform = `scaleX(${p})`;
-    progressEl.setAttribute("aria-valuenow", Math.round(p * 100));
-  };
+  const paintBar = (p) => { bar.style.transform = `scaleX(${p})`; };
   paintBar(pageProgress());
 
   const weak = (navigator.hardwareConcurrency || 4) <= 2;
@@ -161,10 +151,16 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   // Reduced motion keeps the story — it is scrubbed 1:1 by the reader's own
   // scrolling — but drops the inertia so nothing glides after they stop.
   const EASE = reduceMotion ? 1 : 0.1;
+  let lastT = performance.now();
 
   const loop = () => {
     if (!running) return;
-    current += (target - current) * EASE;
+    const now = performance.now();
+    const dt = Math.min(64, now - lastT);
+    lastT = now;
+    // 0.1 per 16.7ms expressed as a rate, so 10fps and 120Hz settle alike.
+    const k = reduceMotion ? 1 : 1 - Math.pow(1 - EASE, dt / 16.667);
+    current += (target - current) * k;
     paintTheme(current);
     scene.apply(current);
     scene.render();
@@ -197,7 +193,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
      they are one movement. Keep these two in sync if either moves. The beats
      leading in are the frame locking (0.44), the flash (0.49) and the cyan
      sweep (0.50), so this begins well inside the capture. */
-  const DARK_FROM = 0.532, DARK_TO = 0.568;
+  const DARK_FROM = 0.520, DARK_TO = 0.580;
   const bodyStyle = document.body.style;
   let lastMix = -1;
 
@@ -240,7 +236,9 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
   document.addEventListener("visibilitychange", () => {
     running = !document.hidden;
-    if (running) { queued = false; kick(); }
+    // Without this the first frame back from a background tab sees the whole
+    // time it spent hidden and jumps.
+    if (running) { lastT = performance.now(); queued = false; kick(); }
   });
 
   scene.apply(current);
