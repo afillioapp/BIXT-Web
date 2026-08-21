@@ -312,23 +312,26 @@ const FOLDER_FRAG = /* glsl */ `
       return;
     }
 
-    // A real folder silhouette: back plate, tab, and the angled front flap.
-    float d = abs(rrect(vP, vec2(h.x, h.y * 0.86), 0.10));
+    /* One continuous silhouette. The shape before this outlined the body and
+       the tab separately, so their edges crossed and doubled where they met,
+       and laid a diagonal right across the middle that read as a slash rather
+       than a flap. Taking abs() of the union draws the merged outline instead,
+       which is what a folder actually looks like. */
+    float body = rrect(vP - vec2(0.0, -h.y * 0.11), vec2(h.x, h.y * 0.72), 0.14);
+    float tab  = rrect(vP - vec2(-h.x + h.x * 0.34, h.y * 0.56),
+                       vec2(h.x * 0.34, h.y * 0.17), 0.10);
+    float d = abs(min(body, tab));
 
-    float tab = abs(rrect(vP - vec2(-h.x + h.x * 0.42, h.y * 0.86 + h.y * 0.11),
-                          vec2(h.x * 0.42, h.y * 0.11), 0.06));
-    d = min(d, max(tab, -0.001));
+    // The front panel sits a little below the back edge, inset at both ends so
+    // it reads as the near side of the folder rather than a rule through it.
+    d = min(d, seg(vP, vec2(-h.x * 0.88, h.y * 0.22), vec2(h.x * 0.88, h.y * 0.22)));
 
-    // Front flap: its top edge rises to the right, the way a folder sits open.
-    float flap = seg(vP, vec2(-h.x, h.y * 0.18), vec2(h.x, h.y * 0.54));
-    d = min(d, flap);
-
-    // What this one holds, in the same line language: a table of numbers on
-    // the left, a photograph on the right. Sits below the flap, which crosses
-    // the middle of the body.
+    // What this one holds: a table of numbers on the left, a photograph on
+    // the right. It grows for the spending beat, but stays under the panel
+    // line, which is what caps how far it can go.
     float grow = (vKind > 0.5) ? 0.0 : uSpend;
-    vec2 ic = vP - vec2(0.0, -h.y * (0.26 - 0.16 * grow));
-    float ih = h.y * (0.26 + 0.30 * grow), iw = ih * 1.15;
+    vec2 ic = vP - vec2(0.0, -h.y * (0.26 - 0.04 * grow));
+    float ih = h.y * (0.26 + 0.19 * grow), iw = ih * 1.15;
     float icon;
     if (vKind > 0.5) {
       icon = abs(rrect(ic, vec2(iw, ih), 0.05));
