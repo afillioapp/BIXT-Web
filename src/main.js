@@ -132,9 +132,9 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
   /* The hinge, and the same window story.js gives paperMat.uInvert: the
      ground turns over on precisely the scroll the receipt turns over on, so
      they are one movement. Keep these two in sync if either moves. The beats
-     leading in are the frame locking (0.44), the flash (0.49) and the cyan
-     sweep (0.50), so this begins well inside the capture. */
-  const DARK_FROM = 0.520, DARK_TO = 0.580;
+     leading in are the frame locking (0.39), the flash (0.44) and the cyan
+     sweep (0.45), so this begins well inside the capture. */
+  const DARK_FROM = 0.463, DARK_TO = 0.517;
   const bodyStyle = document.body.style;
   let lastMix = -1;
 

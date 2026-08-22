@@ -92,10 +92,14 @@ body {
 
 /* ---------- chapters ---------- */
 
-.ch { position: relative; z-index: 1; min-height: 205svh; padding-inline: var(--gutter); }
+/* 260svh, and the hero at exactly 100, so every chapter is worth the same
+   tenth of the scrub and the beats in story.js land on round numbers. Longer
+   than it needs to be to read the words, because the art is the reason to
+   scroll: the sheet writes a cell at a time and wants the runway. */
+.ch { position: relative; z-index: 1; min-height: 260svh; padding-inline: var(--gutter); }
 .ch--hero { min-height: 100svh; display: grid; align-items: center;
   padding-inline: 0; padding-bottom: clamp(48px, 10vh, 120px); }
-.ch--cta { min-height: 205svh; }
+.ch--cta { min-height: 260svh; }
 
 /* The words pin for the length of their chapter, so the text you are reading
    always belongs to the art you are looking at. Without this the copy scrolls
@@ -173,6 +177,15 @@ body {
 }
 
 .ch--hero .display { font-size: clamp(2.125rem, 6.2vw, 4.75rem); }
+/* The three pieces of the hero were stacked on their own default margins,
+   which put the button hard against the tagline. */
+.ch__text--hero { display: flex; flex-direction: column; align-items: flex-start;
+  gap: clamp(14px, 2.2vh, 24px); }
+/* The button is the one thing here that is not reading matter, so it gets a
+   gap of a different order to the one between the headline and the tagline.
+   Bounded in vh because the hero is 100svh: on a short viewport this has to
+   give way rather than push the button into the scroll hint at 21vh. */
+.ch__text--hero .btn { margin-top: clamp(18px, 6vh, 68px); }
 .hero__tag {
   margin-inline: 0; margin-bottom: 0; font-weight: 500; color: var(--ink-soft);
   font-size: clamp(1.0625rem, 1.8vw, 1.5rem); line-height: 1.35;

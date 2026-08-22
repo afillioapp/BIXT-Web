@@ -48,9 +48,10 @@ four beats where the system works and they do nothing.
 | 3 | Connect your **Drive**. | Bixt makes the folder. Your accountant gets read only access. |
 | 4 | Take a **photo**. | That is the whole job. There is no second part to remember. |
 | 5 | **Numbers** come off. | Date, vendor, total, tax, straight off the paper. And it was fuel. |
-| 6 | **Two** folders. | One folder holds the spreadsheet row. One holds the photo. |
-| 7 | What **August** cost. | What the month cost, added up while you were out on a job. |
-| 8 | Your **accountant** sees. | Same folder, read only, always up to date. Nothing to email in April. |
+| 6 | Filed **both** ways. | The numbers go in the sheet. The photo stays beside them, in your own Drive. |
+| 7 | **Row** after row. | Every receipt you photograph writes itself in. You never open the sheet. |
+| 8 | What **August** cost. | What the month cost, added up while you were out on a job. |
+| 9 | Your **accountant** sees. | Same folder, read only, always up to date. Nothing to email in April. |
 | — | Just **Bixt** it. | Photograph the paper. Bixt reads it, files it and adds it up. Three dollars a month. |
 
 ### Two lines, measured

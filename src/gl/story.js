@@ -1,19 +1,21 @@
 /* One continuous scroll-told story, drawn behind the whole page.
 
-   The scene is a single paper receipt plus one cloud of points. The points
-   are re-aimed at a different formation each chapter, so the same particles
-   carry the narrative the whole way down: the ink of one receipt →
-   the ink of one receipt → rows of a spreadsheet → twelve month folders →
-   you and your accountant looking at the same thing → gone.
+   The scene is a single paper receipt, a cloud of out-of-focus receipts
+   behind it, and one spreadsheet. The receipt is found, photographed and
+   turned over into the dark; the sheet writes itself out of it and keeps
+   writing, cell by cell, for as long as the reader keeps scrolling; the month
+   totals and becomes a picture of the spending; both are handed over.
 
-   Two draw calls, no textures. Formations are precomputed once; a chapter
-   change copies two of them into the start/end attributes, and the shader
-   does the interpolation. */
+   The receipt is a shader on a plane and the sheet is a 2D canvas uploaded as
+   a texture, because the sheet's whole point is that it carries real dates and
+   real numbers. Nothing here animates on a clock: every value below is a
+   function of scroll position, so the story runs backwards as cleanly as it
+   runs forwards. */
 
 import {
   Scene, PerspectiveCamera, WebGLRenderer, PlaneGeometry,
   InstancedBufferGeometry, InstancedBufferAttribute, IcosahedronGeometry,
-  ShaderMaterial, MeshBasicMaterial, Mesh, Color, AdditiveBlending, Vector2, Vector4, CanvasTexture, SRGBColorSpace,
+  ShaderMaterial, MeshBasicMaterial, Mesh, Color, AdditiveBlending, Vector2, CanvasTexture, SRGBColorSpace,
 } from "three";
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -253,218 +255,300 @@ function buildCrowd() {
   return g;
 }
 
-/* ---------- folders, drawn as solid lines ---------- */
+/* ---------- the hand-off rule ---------- */
 
-/* Stroked geometry, not a cloud of points: at this size particles read as
-   noise, and the site's line language is the solid rule under the wordmark. */
+/* The one mark left over from the folders that used to stand here: a solid
+   cyan rule that runs under both halves when the accountant is given them.
+   It is a rule rather than a shape because the site's line language is the
+   solid rule under the wordmark. */
 
-const FOLDER_VERT = /* glsl */ `
-  attribute vec3 aPos;
-  attribute vec2 aSize;
-  attribute float aKind;
-  attribute float aPhase;
-  uniform vec4 uPhaseA;
+const RULE_VERT = /* glsl */ `
   varying vec2 vP;
-  varying vec2 vHalf;
-  varying float vKind;
-  varying float vOn;
   void main() {
-    vHalf = aSize * 0.5;
-    vP = position.xy * (aSize + 0.9);
-    vKind = aKind;
-    // Each instance belongs to one beat; uPhaseA carries the three opacities.
-    vOn = aPhase < 0.5 ? uPhaseA.x
-        : aPhase < 1.5 ? uPhaseA.y
-        : aPhase < 2.5 ? uPhaseA.z : uPhaseA.w;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(vec3(vP, 0.0) + aPos, 1.0);
+    vP = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
-const FOLDER_FRAG = /* glsl */ `
+const RULE_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform float uDraw, uThick, uSpend, uStack;
+  uniform vec2 uHalf;
+  uniform float uAlpha, uExt;
   varying vec2 vP;
-  varying vec2 vHalf;
-  varying float vKind;
-  varying float vOn;
-
   float rrect(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
   }
-  float seg(vec2 p, vec2 a, vec2 b) {
-    vec2 pa = p - a, ba = b - a;
-    return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
-  }
-
   void main() {
-    if (vOn < 0.01) discard;
-    vec2 h = vHalf;
-
-    // The link between the two surfaces is a solid rule, not a folder.
-    if (vKind > 1.5) {
-      // Runs itself outward on its own opacity, so it does not need a shared
-      // growth value that is already spent by the time this beat arrives.
-      float ext = clamp(vOn * 1.25, 0.0, 1.0);
-      float solid = smoothstep(0.012, 0.0, rrect(vP, vec2(h.x * ext, h.y), h.y));
-      if (solid < 0.01) discard;
-      gl_FragColor = vec4(uCyan * 1.6, solid * vOn);
-      return;
-    }
-
-    /* No folder around it any more: what the folder held is the object. Each
-       side fills the same box, at the size the receipt itself carries, and each
-       has its own thing to do as the reader scrolls, because only the left one
-       used to move. */
-    float d = 1000.0;
-
-    if (vKind > 0.5) {
-      // Supporting documents: a photograph, with more stacking up behind it.
-      float iw = h.x * 0.74, ih = h.y * 0.72;
-      for (int i = 2; i >= 1; i--) {
-        float t = clamp(uStack * 1.55 - float(i - 1) * 0.38, 0.0, 1.0);
-        vec2 off = vec2(iw * 0.15, ih * 0.16) * float(i) * t;
-        d = min(d, abs(rrect(vP - off, vec2(iw, ih), 0.10)) + (1.0 - t) * 0.22);
-      }
-      d = min(d, abs(rrect(vP, vec2(iw, ih), 0.10)));
-
-      // A horizon, two peaks behind it and a sun: enough to read as a picture
-      // rather than an abstract mark at this size.
-      d = min(d, seg(vP, vec2(-iw, -ih * 0.26), vec2(iw, -ih * 0.26)));
-      d = min(d, seg(vP, vec2(-iw * 0.68, -ih * 0.26), vec2(-iw * 0.20, ih * 0.26)));
-      d = min(d, seg(vP, vec2(-iw * 0.20,  ih * 0.26), vec2( iw * 0.14, -ih * 0.26)));
-      d = min(d, seg(vP, vec2(-iw * 0.04, -ih * 0.02), vec2( iw * 0.30,  ih * 0.36)));
-      d = min(d, seg(vP, vec2( iw * 0.30,  ih * 0.36), vec2( iw * 0.72, -ih * 0.26)));
-      d = min(d, abs(length(vP - vec2(iw * 0.44, ih * 0.50)) - ih * 0.12));
-
-      // Two lines of caption where a filed photograph carries its date.
-      d = min(d, seg(vP, vec2(-iw * 0.72, -ih * 0.56), vec2( iw * 0.16, -ih * 0.56)));
-      d = min(d, seg(vP, vec2(-iw * 0.72, -ih * 0.76), vec2(-iw * 0.10, -ih * 0.76)));
-    } else {
-      /* Expenses: a table of numbers that becomes a picture of the spending.
-         Pushing a distance past the stroke width is how each half fades, so
-         the rules dissolve as the columns rise rather than cutting. */
-      float iw = h.x * 0.82, ih = h.y * 0.74;
-      d = abs(rrect(vP, vec2(iw, ih), 0.11));
-
-      float head = ih * 0.54;
-      float rules = seg(vP, vec2(-iw, head), vec2(iw, head));
-      rules = min(rules, seg(vP, vec2(-iw * 0.22, -ih), vec2(-iw * 0.22, ih)));
-      rules = min(rules, seg(vP, vec2( iw * 0.38, -ih), vec2( iw * 0.38, ih * 0.54)));
-      for (int i = 1; i <= 3; i++) {
-        float y = head - float(i) * (ih * 0.36);
-        rules = min(rules, seg(vP, vec2(-iw, y), vec2(iw, y)));
-      }
-      // The one row that matters, boxed the way the sheet highlights it.
-      rules = min(rules, abs(rrect(vP - vec2(0.0, head - ih * 0.54),
-                                   vec2(iw * 0.97, ih * 0.17), 0.03)));
-      d = min(d, rules + uSpend * 0.22);
-
-      // and the chart it becomes, on a baseline of its own
-      float base = -ih * 0.82;
-      d = min(d, seg(vP, vec2(-iw * 0.94, base), vec2(iw * 0.94, base))
-                 + (1.0 - uSpend) * 0.22);
-      float bw = iw * 0.11;
-      for (int i = 0; i < 4; i++) {
-        float bh = max(0.0015, ih * (0.30 + 0.21 * float(i)) * uSpend);
-        vec2 bc = vP - vec2((float(i) - 1.5) * iw * 0.44, base + bh);
-        d = min(d, rrect(bc, vec2(bw, bh), min(bw * 0.45, bh))
-                   + (1.0 - uSpend) * 0.22);
-      }
-    }
-
-    // Rises from the bottom, the same rule the whole page moves by.
-    float reveal = step((vP.y + h.y) / (2.0 * h.y), uDraw * 1.15 + 0.02);
-
-    // Neon: a bright core inside a soft halo.
-    float core = smoothstep(uThick, 0.0, d);
-    float glow = smoothstep(uThick * 9.0, 0.0, d);
-    float a = clamp(core + glow * 0.42, 0.0, 1.0) * vOn * reveal;
+    // Runs itself outward from the middle, so the rule is drawn rather than
+    // faded on.
+    float d = rrect(vP, vec2(uHalf.x * uExt, uHalf.y), uHalf.y);
+    float core = smoothstep(0.010, 0.0, d);
+    float glow = smoothstep(0.090, 0.0, d);
+    float a = clamp(core + glow * 0.34, 0.0, 1.0) * uAlpha;
     if (a < 0.004) discard;
-    gl_FragColor = vec4(uCyan * (1.25 + core * 1.15), a);
+    gl_FragColor = vec4(uCyan * (1.30 + core * 1.10), a);
   }
 `;
 
-function buildFolders() {
-  const base = new PlaneGeometry(1, 1);
-  const g = new InstancedBufferGeometry();
-  g.index = base.index;
-  g.attributes.position = base.attributes.position;
-  g.attributes.uv = base.attributes.uv;
-
-  //            x      y     w     h    kind  phase
-  const inst = [
-    // The pair. Identical, mirrored, and lit from here to the end: everything
-    // that follows happens to these two rather than replacing them.
-    [-2.42,  0.10,  2.86, 2.32,  0,  0],   // Expenses, where the sheet goes
-    [ 2.42,  0.10,  2.86, 2.32,  1,  0],   // Supporting Documents, where the photo goes
-
-    // The hand-off: one rule under both, because the accountant is given the
-    // same two folders rather than a copy of them.
-    [ 0.00, -1.16,  7.10, 0.055, 2,  1],
-  ];
-  g.instanceCount = inst.length;
-  const pos = new Float32Array(inst.length * 3), size = new Float32Array(inst.length * 2);
-  const kind = new Float32Array(inst.length), phase = new Float32Array(inst.length);
-  inst.forEach((r, i) => {
-    pos[i * 3] = r[0]; pos[i * 3 + 1] = r[1]; pos[i * 3 + 2] = 0.05;
-    size[i * 2] = r[2]; size[i * 2 + 1] = r[3];
-    kind[i] = r[4]; phase[i] = r[5];
-  });
-  g.setAttribute("aPos", new InstancedBufferAttribute(pos, 3));
-  g.setAttribute("aSize", new InstancedBufferAttribute(size, 2));
-  g.setAttribute("aKind", new InstancedBufferAttribute(kind, 1));
-  g.setAttribute("aPhase", new InstancedBufferAttribute(phase, 1));
-  return g;
-}
-
 /* ---------- the expenses sheet ---------- */
 
-/* The structured half of the receipt: the same transaction, written as a row
-   in a spreadsheet. Drawn dark to match the inverted receipt it comes out of. */
-function makeSheetTexture() {
-  const w = 900, h = 620;
+/* The structured half of the receipt: the same transaction written as a row,
+   and then the rest of the month written in around it.
+
+   This is not a picture that fades in. It is a canvas the reader's scroll
+   writes: cells land one at a time behind a caret, the month totals itself,
+   the totals become a chart. Redrawing is gated on a quantised signature, so
+   a whole chapter of scrolling costs on the order of a hundred redraws rather
+   than one per frame. */
+
+const SHEET_ROWS = [
+  ["04 Aug 2026", "Home Depot",    "Supplies", "142.11", "16.34", "IMG_0388"],
+  ["09 Aug 2026", "Tim Hortons",   "Meals",     "18.75",  "2.16", "IMG_0394"],
+  ["12 Aug 2026", "Esso",          "Gas",       "99.81", "11.48", "IMG_0412"],
+  ["15 Aug 2026", "Canadian Tire", "Tools",     "77.40",  "8.90", "IMG_0423"],
+  ["21 Aug 2026", "Petro-Canada",  "Gas",       "88.02", "10.12", "IMG_0441"],
+];
+// The receipt just photographed lands first — it is the one the reader watched
+// happen — and the rest of the month fills in around it, in date order.
+const SHEET_ORDER = [2, 0, 1, 3, 4];
+const LIVE_ROW = 2;
+const SHEET_TOTAL = 426.09, SHEET_HST = 49.0;
+const SHEET_CATS = [["Gas", 187.83], ["Supplies", 142.11], ["Tools", 77.4], ["Meals", 18.75]];
+
+const SH_BG = "#0d1420", SH_EDGE = "#26344a", SH_LINE = "#1e293a",
+      SH_INK = "#eef2f7", SH_MUT = "#7d89a0", SH_CY = "#3fd6c6", SH_BAR = "#2b415c";
+
+/* Two layouts, not one shrunk. Side by side with the photo the sheet gets a
+   wide frame and can carry six columns; stacked above it on a phone the frame
+   is nearly square and three columns at twice the size are what stays
+   readable. Same canvas element either way.
+
+   growRows / growBand are how much of the canvas height is drawn before the
+   totals and the chart arrive: the card grows downward as the month fills it
+   in, instead of standing there two thirds empty for two chapters. */
+const SHEET_WIDE = {
+  w: 1180, h: 880, pad: 44, title: 62, top: 118, rowH: 58, rows: 5,
+  size: 25, head: 21,
+  cols: [[66, "left"], [300, "left"], [520, "left"], [770, "right"], [900, "right"], [940, "left"]],
+  keys: [0, 1, 2, 3, 4, 5],
+  heads: ["Date", "Vendor", "Category", "Total", "HST", "Photo"],
+  figs: [66, 480, 760], labelY: 476, bigY: 552, big: 62, sepY: 600,
+  chart: { base: 800, top: 630, bw: 150, gap: 90, labelY: 842 },
+};
+const SHEET_TALL = {
+  w: 820, h: 860, pad: 36, title: 58, top: 130, rowH: 62, rows: 5,
+  size: 30, head: 25,
+  cols: [[56, "left"], [240, "left"], [764, "right"]],
+  keys: [0, 1, 3],                             // date, vendor, total
+  heads: ["Date", "Vendor", "Total"],
+  short: true,
+  figs: [56, 456], labelY: 516, bigY: 594, big: 66, sepY: 634,
+  chart: { base: 792, top: 664, bw: 130, gap: 50, labelY: 822 },
+};
+
+/* Derived, never typed: growRows is where the table ends and growBand is where
+   the totals band ends, so moving `top`, `rowH` or `sepY` carries the card's
+   bottom edge with them instead of leaving it behind by a few pixels. */
+for (const M of [SHEET_WIDE, SHEET_TALL]) {
+  M.growRows = (M.top + M.rows * M.rowH + 24) / M.h;
+  M.growBand = (M.sepY + 12) / M.h;
+}
+
+function createSheet() {
   const cv = document.createElement("canvas");
-  cv.width = w; cv.height = h;
-  const x = cv.getContext("2d");
-  const BG = "#0d1420", LINE = "#232e3f", INKC = "#eef2f7", MUT = "#8a94a6", CY = "#3fd6c6";
-  const font = (px, wt = "400") => `${wt} ${px}px ui-monospace, "SF Mono", Menlo, monospace`;
+  const g = cv.getContext("2d");
+  const tex = new CanvasTexture(cv);
+  tex.colorSpace = SRGBColorSpace; tex.anisotropy = 4;
 
-  x.fillStyle = BG; x.fillRect(0, 0, w, h);
+  let M = null, sig = "";
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const font = (px, wt = "400") =>
+    `${wt} ${px}px ui-monospace, "SF Mono", Menlo, monospace`;
+  const money = (v) => "$" + v.toFixed(2);
 
-  const cols = [40, 210, 400, 560, 700, 840];
-  const head = ["Date", "Vendor", "Category", "Total", "HST"];
-  x.font = font(22, "700"); x.fillStyle = MUT;
-  head.forEach((t, i) => { x.textAlign = "left"; x.fillText(t, cols[i], 52); });
-
-  x.strokeStyle = LINE; x.lineWidth = 2;
-  for (let r = 0; r <= 8; r++) {
-    const y = 74 + r * 60;
-    x.beginPath(); x.moveTo(24, y); x.lineTo(w - 24, y); x.stroke();
+  function rrect(x0, y0, w, h, r) {
+    const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+    g.beginPath();
+    g.moveTo(x0 + rr, y0);
+    g.arcTo(x0 + w, y0, x0 + w, y0 + h, rr);
+    g.arcTo(x0 + w, y0 + h, x0, y0 + h, rr);
+    g.arcTo(x0, y0 + h, x0, y0, rr);
+    g.arcTo(x0, y0, x0 + w, y0, rr);
+    g.closePath();
   }
-  cols.forEach((c) => { x.beginPath(); x.moveTo(c - 16, 24); x.lineTo(c - 16, h - 24); x.stroke(); });
 
-  const rows = [
-    ["04 Aug 2026", "Home Depot", "Supplies", "142.11", "16.34"],
-    ["09 Aug 2026", "Tim Hortons", "Meals", "18.75", "2.16"],
-    ["12 Aug 2026", "Esso", "Gas", "99.81", "11.48"],
-    ["15 Aug 2026", "Canadian Tire", "Tools", "77.40", "8.90"],
-    ["21 Aug 2026", "Petro-Canada", "Gas", "88.02", "10.12"],
-  ];
-  rows.forEach((r, i) => {
-    const y = 74 + i * 60, live = i === 2;          // the receipt we just read
-    if (live) {
-      x.fillStyle = CY; x.globalAlpha = 0.16;
-      x.fillRect(24, y + 2, w - 48, 56); x.globalAlpha = 1;
+  /** Pick the layout the frame has room for. Returns the new width/height ratio. */
+  function layout(compact) {
+    const next = compact ? SHEET_TALL : SHEET_WIDE;
+    if (next === M) return;
+    M = next;
+    cv.width = M.w; cv.height = M.h;
+    sig = "";                                   // the canvas is blank again
+  }
+
+  function drawRows(s) {
+    const L = M.pad, R = M.w - M.pad;
+
+    g.font = font(M.head, "700"); g.fillStyle = SH_MUT; g.textBaseline = "alphabetic";
+    M.cols.forEach(([x, align], i) => {
+      g.textAlign = align;
+      g.fillText(M.heads[i], x, M.top - 18);
+    });
+    g.textAlign = "left";
+
+    // The grid exists before the numbers land in it: a sheet waiting to be filled.
+    g.strokeStyle = SH_LINE; g.lineWidth = 2;
+    for (let i = 0; i <= M.rows; i++) {
+      const y = M.top + i * M.rowH;
+      g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke();
     }
-    x.font = font(23, live ? "700" : "400");
-    x.fillStyle = live ? CY : INKC;
-    r.forEach((cell, c) => { x.textAlign = "left"; x.fillText(cell, cols[c], y + 40); });
-  });
 
-  const t = new CanvasTexture(cv);
-  t.colorSpace = SRGBColorSpace; t.anisotropy = 4;
-  return t;
+    const nCols = M.cols.length;
+    SHEET_ORDER.forEach((r, k) => {
+      const t = clamp01(s.rows - k);
+      if (t <= 0.001) return;
+      const y = M.top + r * M.rowH, live = r === LIVE_ROW;
+
+      // Each row lands lit and settles; the one we photographed keeps a wash.
+      const flash = Math.max(live ? 0.15 : 0, clamp01(t * 6) * (1 - t) * 0.5);
+      if (flash > 0.004) {
+        g.fillStyle = SH_CY; g.globalAlpha = flash;
+        g.fillRect(L, y + 2, R - L, M.rowH - 4); g.globalAlpha = 1;
+      }
+
+      const cells = SHEET_ROWS[r];
+      const by = y + M.rowH * 0.5 + M.size * 0.36;
+      g.font = font(M.size, live ? "700" : "400");
+      g.fillStyle = live ? SH_CY : SH_INK;
+
+      /* Each cell owns a slice of the row's window and fades in across it, so
+         the numbers arrive rather than switching on. Alpha falls as c rises,
+         which is why breaking out is safe. */
+      const slice = 1 / (nCols + 2);
+      let caret = L, caretA = 0;
+      for (let c = 0; c < nCols; c++) {
+        const a = clamp01((t - c * slice) / (slice * 1.7));
+        if (a <= 0.012) break;
+        const [x, align] = M.cols[c];
+        const raw = cells[M.keys[c]];
+        const txt = M.short && c === 0 ? raw.slice(0, 6) : raw;
+        g.globalAlpha = a;
+        g.textAlign = align;
+        g.fillText(txt, x, by);
+        caret = align === "right" ? x + 12 : x + g.measureText(txt).width + 12;
+        caretA = 1 - a;                 // brightest just as the next cell starts
+      }
+      g.globalAlpha = 1;
+      g.textAlign = "left";
+
+      // The cell being written.
+      if (caretA > 0.02 && t < 0.999) {
+        g.fillStyle = SH_CY; g.globalAlpha = caretA * 0.8;
+        g.fillRect(caret, y + M.rowH * 0.28, M.size * 0.55, M.rowH * 0.46);
+        g.globalAlpha = 1;
+      }
+    });
+  }
+
+  function drawBand(s) {
+    const L = M.pad, R = M.w - M.pad;
+    const figs = [
+      ["AUGUST TOTAL", money(SHEET_TOTAL * s.tally), SH_CY, 1],
+      ["HST", money(SHEET_HST * s.tally), SH_INK, 0.56],
+      ["RECEIPTS", String(Math.round(SHEET_ROWS.length * s.tally)), SH_INK, 0.56],
+    ];
+    g.globalAlpha = s.totals;
+    g.textAlign = "left";
+    M.figs.forEach((x, i) => {
+      const [label, val, col, rel] = figs[i];
+      g.font = font(M.head, "700"); g.fillStyle = SH_MUT;
+      g.fillText(label, x, M.labelY);
+      g.font = font(M.big * rel, "700"); g.fillStyle = col;
+      g.fillText(val, x, M.bigY - M.big * (1 - rel) * 0.12);
+    });
+    g.strokeStyle = SH_LINE; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(L, M.sepY); g.lineTo(R, M.sepY); g.stroke();
+    g.globalAlpha = 1;
+  }
+
+  function drawChart(s) {
+    const c = M.chart, L = M.pad, R = M.w - M.pad, span = SHEET_CATS.length;
+    const wAll = span * c.bw + (span - 1) * c.gap;
+    const x0 = L + ((R - L) - wAll) / 2;
+    const maxH = c.base - c.top, peak = SHEET_CATS[0][1];
+
+    g.globalAlpha = s.bars;
+    g.strokeStyle = SH_LINE; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(L, c.base); g.lineTo(R, c.base); g.stroke();
+
+    SHEET_CATS.forEach(([name, v], i) => {
+      // Staggered, so the bars rise one after another rather than as a block.
+      const t = clamp01(s.bars * 1.45 - i * 0.13);
+      const h = maxH * (v / peak) * t, x = x0 + i * (c.bw + c.gap);
+      if (h > 1) {
+        g.fillStyle = i === 0 ? SH_CY : SH_BAR;
+        rrect(x, c.base - h, c.bw, h, 7); g.fill();
+      }
+      const lab = clamp01((t - 0.55) * 3);
+      if (lab > 0.01) {
+        g.textAlign = "center";
+        g.globalAlpha = s.bars * lab;
+        g.font = font(M.head * 0.95, "700"); g.fillStyle = i === 0 ? SH_CY : SH_INK;
+        g.fillText(money(v), x + c.bw / 2, c.base - h - 14);
+        g.font = font(M.head * 0.88); g.fillStyle = SH_MUT;
+        g.fillText(name.toUpperCase(), x + c.bw / 2, c.labelY);
+        g.globalAlpha = s.bars; g.textAlign = "left";
+      }
+    });
+    g.globalAlpha = 1;
+  }
+
+  function draw(s) {
+    g.clearRect(0, 0, M.w, M.h);
+    // The card is only as tall as the month has filled it. Everything below
+    // s.grow is cropped off the texture by the caller, so the rounded bottom
+    // edge has to be drawn where the crop lands, not at the canvas floor.
+    g.fillStyle = SH_BG; rrect(2, 2, M.w - 4, M.h * s.grow - 4, 20); g.fill();
+    g.strokeStyle = SH_EDGE; g.lineWidth = 2; g.stroke();
+
+    g.textBaseline = "alphabetic"; g.textAlign = "left";
+    g.font = font(M.head, "700"); g.fillStyle = SH_MUT;
+    g.fillText("EXPENSES · AUGUST 2026", M.pad, M.title);
+
+    // The accountant's beat, written on the sheet itself.
+    if (s.shared > 0.01) {
+      const cw = M.short ? 260 : 300, ch = M.head * 2.1;
+      const cx = M.w - M.pad - cw, cy = M.title - ch * 0.72;
+      rrect(cx, cy, cw, ch, ch / 2);
+      g.globalAlpha = s.shared * 0.12; g.fillStyle = SH_CY; g.fill();
+      g.globalAlpha = s.shared; g.strokeStyle = SH_CY; g.lineWidth = 2; g.stroke();
+      g.font = font(M.head * 0.86, "700"); g.fillStyle = SH_CY; g.textAlign = "center";
+      g.fillText("SHARED · VIEW ONLY", cx + cw / 2, M.title);
+      g.textAlign = "left"; g.globalAlpha = 1;
+    }
+
+    drawRows(s);
+    if (s.totals > 0.01) drawBand(s);
+    if (s.bars > 0.01) drawChart(s);
+  }
+
+  /** Quantised so a frame that changes nothing visible does not repaint. */
+  function set(s) {
+    const key = M.w + "|" + Math.round(s.rows * 40) + "|" + Math.round(s.grow * 60)
+      + "|" + Math.round(s.tally * 80) + "|" + Math.round(s.bars * 36)
+      + "|" + Math.round(s.shared * 12);
+    if (key === sig) return;
+    sig = key; draw(s); tex.needsUpdate = true;
+  }
+
+  return {
+    texture: tex, layout, set,
+    get aspect() { return M.w / M.h; },
+    get growRows() { return M.growRows; },
+    get growBand() { return M.growBand; },
+    dispose() { tex.dispose(); },
+  };
 }
 
 /* ---------- capture frame ---------- */
@@ -546,7 +630,8 @@ export function createStory(canvas) {
     name: "crowd",
     vertexShader: CROWD_VERT, fragmentShader: CROWD_FRAG,
     transparent: true, depthWrite: false,
-    uniforms: { uCull: { value: 0 }, uAlpha: { value: 0 }, uInk: { value: INK } },
+    // No uInk: the crowd lights itself off its own facet normals.
+    uniforms: { uCull: { value: 0 }, uAlpha: { value: 0 } },
   });
   const crowd = new Mesh(buildCrowd(), crowdMat);
   crowd.renderOrder = -1;
@@ -567,24 +652,26 @@ export function createStory(canvas) {
   capture.position.z = 0.06;
   scene.add(capture);
 
-  const folderMat = new ShaderMaterial({
-    name: "folders",
-    vertexShader: FOLDER_VERT, fragmentShader: FOLDER_FRAG,
+  // The hand-off: one rule under both halves when the accountant is given them.
+  const linkMat = new ShaderMaterial({
+    name: "link",
+    vertexShader: RULE_VERT, fragmentShader: RULE_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
-    uniforms: { uCyan: { value: CYAN }, uPhaseA: { value: new Vector4(0, 0, 0, 0) },
-                uDraw: { value: 0 }, uThick: { value: 0.016 }, uSpend: { value: 0 }, uStack: { value: 0 } },
+    uniforms: { uCyan: { value: CYAN }, uHalf: { value: new Vector2(3.4, 0.028) },
+                uAlpha: { value: 0 }, uExt: { value: 0 } },
   });
-  const folders = new Mesh(buildFolders(), folderMat);
-  folders.frustumCulled = false;
-  scene.add(folders);
+  const link = new Mesh(new PlaneGeometry(9, 1), linkMat);
+  link.frustumCulled = false;
+  link.visible = false;
+  scene.add(link);
 
   // A standard material on purpose: the custom sheet shader intermittently
   // failed to link, and when it did the spreadsheet never drew at all.
-  const sheetTex = makeSheetTexture();
+  const sheetArt = createSheet();
+  sheetArt.layout(false);
   const sheetMat = new MeshBasicMaterial({
-    name: "sheet", map: sheetTex, transparent: true, depthWrite: false, opacity: 0,
+    name: "sheet", map: sheetArt.texture, transparent: true, depthWrite: false, opacity: 0,
   });
-  const SHEET_W = 3.5, SHEET_H = 2.4;
   const sheet = new Mesh(new PlaneGeometry(1, 1), sheetMat);   // scale carries size
   sheet.visible = false;
   scene.add(sheet);
@@ -593,12 +680,13 @@ export function createStory(canvas) {
   const range = (v, a, b) => clamp01((v - a) / (b - a));
 
   /* The canvas is the content column, so the frame is narrow and its aspect
-     barely changes with the viewport. Whatever width the frame cannot show at
-     full size, the wide arrangements shrink into: on a phone the folder pair
-     used to run off both edges entirely. */
+     barely changes with the viewport. The back half of the story lays the
+     sheet and the photograph out inside whatever half-width the frame has:
+     side by side when there is room, stacked when there is not. A six-column
+     table scaled to a third of a phone is not a table, it is a texture. */
   const FOV_T = Math.tan((38 * Math.PI / 180) / 2);
-  const DESIGN_HALF_W = 4.05;          // the pair at its new size, glow included
-  let fit = 1;
+  const SHEET_MAX_W = 4.05;            // the sheet at full size, on a wide frame
+  let avail = 3.4, wide = 1;
 
   function resize() {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
@@ -609,120 +697,172 @@ export function createStory(canvas) {
     camera.position.x = 0;
     camera.position.z = 9.3;
     camera.updateProjectionMatrix();
-    fit = Math.min(1, (FOV_T * camera.position.z * camera.aspect) / DESIGN_HALF_W);
+    avail = FOV_T * camera.position.z * camera.aspect;
+    wide = clamp01((avail - 1.80) / (3.00 - 1.80));
+    sheetArt.layout(wide < 0.5);
   }
 
-  /** p is progress through the whole page, 0 at the top, 1 at the bottom. */
+  /* p is progress through the whole story, 0 at the top, 1 at the bottom.
+
+     Every number below is a position on that one value, and they are not
+     arbitrary: `.ch` is 260svh and `.ch--hero` is 100svh, which makes the
+     story 2700svh with 2600svh of travel, so each chapter is exactly a tenth
+     of p and chapter n's copy is up from 0.0192 + 0.1(n-1) to 0.1 later.
+
+       hero 0.000  01 .019  02 .119  03 .219  04 .319  05 .419
+       06 .519   07 .619   08 .719   09 .819   cta .919
+
+     Change either height in main.css and every window here moves. */
   function apply(p) {
     const ease = (v) => v * v * (3 - 2 * v);
+
+    /* Where the two halves end up. The sheet takes what the frame will give
+       it, the photograph is sized against it, and the pair hangs from one top
+       edge so the sheet can grow downward without either of them drifting.
+
+       Wide frames stand them side by side; narrow ones stack the photograph
+       above the sheet, because a six-column table squeezed into a third of a
+       phone is not a table any more. Whatever the arrangement, the pair is
+       then scaled to fit the band above the chapter copy. */
+    const sheetW0 = Math.min(SHEET_MAX_W, avail * (1.88 - 0.68 * wide));
+    const sheetH0 = sheetW0 / sheetArt.aspect;
+    const paperH0 = sheetH0 * (0.82 - 0.30 * (1 - wide));
+    const stackGap = 0.28;
+    const pairH0 = sheetH0 + (paperH0 + stackGap) * (1 - wide);
+
+    // The copy owns the lower third of the frame; this is what is left.
+    const k = Math.min(1, 3.6 / pairH0);
+    const sheetW = sheetW0 * k, sheetH = sheetH0 * k;
+    const paperH = paperH0 * k, paperW = paperH * (W / H);
+    const pairH = pairH0 * k;
+    const pairW = sheetW + (paperW + 0.10 * sheetW) * wide;
+
+    const SHEET_X = (-pairW / 2 + sheetW / 2) * wide;
+    const PAPER_X = (pairW / 2 - paperW / 2) * wide;
+    const PAPER_TOP = 0.04 + pairH / 2;
+    const SHEET_TOP = PAPER_TOP - (paperH + stackGap * k) * (1 - wide);
+
     // 07: the information separates. The receipt keeps the image and moves
     // aside; a second copy of it becomes the row in the sheet.
-    const settle = ease(range(p, 0.582, 0.628));
-    // The document and the photograph travel out into the two folders as those
-    // draw, so the folders are where the objects went rather than a new pair of
-    // shapes that replaced them.
-    const intoFolder = ease(range(p, 0.622, 0.686));
-    const FOLDER_X = 2.42 * fit, FOLDER_Y = 0.10 * fit;
-    folders.scale.setScalar(fit);
+    const settle = ease(range(p, 0.519, 0.566));
 
     // The pile arrives with chapter 01 and empties out as the story advances:
     // that thinning is the promise the page is making.
-    crowdMat.uniforms.uAlpha.value = range(p, 0.020, 0.070) * (1 - range(p, 0.330, 0.420));
-    crowdMat.uniforms.uCull.value = range(p, 0.100, 0.400);
+    crowdMat.uniforms.uAlpha.value = range(p, 0.013, 0.058) * (1 - range(p, 0.292, 0.373));
+    crowdMat.uniforms.uCull.value = range(p, 0.085, 0.355);
 
-    paperMat.uniforms.uCrumple.value = 1 - range(p, 0.12, 0.30);
-    paper.rotation.z = (1 - range(p, 0.04, 0.30)) * 0.28;
-    paper.rotation.y = (1 - range(p, 0.04, 0.32)) * -0.45;
+    paperMat.uniforms.uCrumple.value = 1 - range(p, 0.103, 0.265);
+    paper.rotation.z = (1 - range(p, 0.031, 0.265)) * 0.28;
+    // Keeps a little of its turn once it is filed, so the photograph beside
+    // the sheet still reads as an object rather than a sticker.
+    paper.rotation.y = (1 - range(p, 0.031, 0.283)) * -0.45 - settle * 0.10;
 
-    const scan = range(p, 0.386, 0.442);
-    paperMat.uniforms.uScan.value = p >= 0.386 && p <= 0.460 ? scan : -1;
+    const scan = range(p, 0.342, 0.393);
+    paperMat.uniforms.uScan.value = p >= 0.342 && p <= 0.409 ? scan : -1;
 
-    // The receipt empties out as it becomes the folder it is filed in. It used
-    // to reappear small at the end, which left a stray dark receipt on screen
-    // during a beat that is about the folders.
-    const gone = range(p, 0.640, 0.690);
     // Clear the stage before the call to action so it stands on its own.
-    const clear = 1 - range(p, 0.945, 0.985);
-    const arrive = range(p, 0.045, 0.100);
-    paperMat.uniforms.uFade.value = (1 - gone * 0.998) * clear * arrive;
-    // Meets the folder at whatever size the folder ended up.
-    // The narrower the frame, the smaller the receipt has to be to leave the
-    // copy its room: at 375 the column is a third of the designed width.
-    const sc = 0.84 * (0.78 + 0.22 * fit) * (1 - settle * 0.35)
-             * (1 - intoFolder * 0.30) * (1 - intoFolder * (1 - fit));
+    // The closing chapter's copy is up from 0.92, so this has to be finished
+    // by then or the price is read through a spreadsheet.
+    const clear = 1 - range(p, 0.882, 0.922);
+    const arrive = range(p, 0.035, 0.085);
+    // The receipt is no longer swallowed by a folder: it is the photograph
+    // that was filed, so it stays on screen next to its own row until the
+    // page hands over to the price.
+    paperMat.uniforms.uFade.value = clear * arrive;
+
+    // Loose in the frame while it is still paper; sized to stand beside the
+    // sheet once it has been filed.
+    const held = 0.84 * (0.78 + 0.22 * Math.min(1, avail / 3.0));
+    const sc = held + (paperH / H - held) * settle;
     paper.scale.set(sc, sc, 1);
 
-    // The photograph is what the second folder holds.
-    const paperX = 1.75 * fit * settle;
-    paper.position.x = paperX + intoFolder * (FOLDER_X - paperX);
-    // Rises to the shared centre line as it settles, and is already there by
-    // the time the folder draws around it, so the morph is horizontal only.
-    const paperY = -0.10 + (FOLDER_Y + 0.10) * settle;
-    paper.position.y = paperY + intoFolder * (FOLDER_Y - paperY);
+    paper.position.x = PAPER_X * settle;
+    // A slow scroll-driven bob once it is filed, so the pair keeps moving
+    // while the sheet writes itself.
+    const paperRest = PAPER_TOP - paperH / 2;
+    paper.position.y = -0.10 + (paperRest + 0.10) * settle
+                     + Math.sin(p * 34.0) * 0.035 * settle;
 
     // Edges found, locked, taken. This is what earns the switch to dark.
     // 02 rectangle -> 03 cyan sweeps the paper -> 04 full cyan and a flash
     // -> 05 the same receipt, inverted.
-    paperMat.uniforms.uWipe.value = ease(range(p, 0.500, 0.526));
-    paperMat.uniforms.uCyanHold.value = range(p, 0.498, 0.504) * (1 - range(p, 0.540, 0.574));
+    paperMat.uniforms.uWipe.value = ease(range(p, 0.445, 0.468));
+    paperMat.uniforms.uCyanHold.value = range(p, 0.443, 0.448) * (1 - range(p, 0.481, 0.511));
     paperMat.uniforms.uShutter.value =
-      ease(range(p, 0.520, 0.531)) * (1 - ease(range(p, 0.531, 0.554)));
-    paperMat.uniforms.uInvert.value = ease(range(p, 0.520, 0.580));
-    paperMat.uniforms.uExtract.value = range(p, 0.556, 0.596) * (1 - range(p, 0.638, 0.672));
+      ease(range(p, 0.463, 0.473)) * (1 - ease(range(p, 0.473, 0.493)));
+    paperMat.uniforms.uInvert.value = ease(range(p, 0.463, 0.517));
+    // The two fields it read stay lit until they have landed in the row.
+    paperMat.uniforms.uExtract.value = range(p, 0.495, 0.531) * (1 - range(p, 0.620, 0.664));
 
-    const lock = range(p, 0.440, 0.486);
+    const lock = range(p, 0.391, 0.432);
     const e = lock * lock * (3.0 - 2.0 * lock);
     const psc = paper.scale.x;
     const tight = [(W / 2) * psc * 1.045, (H / 2) * psc * 1.015];
     capMat.uniforms.uHalf.value.set(
       tight[0] * (1 + (1 - e) * 0.62), tight[1] * (1 + (1 - e) * 0.06));
     capMat.uniforms.uLen.value = 0.58 - e * 0.28;
-    capMat.uniforms.uFull.value = range(p, 0.482, 0.502);
+    capMat.uniforms.uFull.value = range(p, 0.429, 0.447);
     capMat.uniforms.uFlash.value =
-      range(p, 0.492, 0.506) * (1 - range(p, 0.506, 0.530)) * 0.30;
-    capture.visible = p > 0.42 && p < 0.60;
+      range(p, 0.438, 0.450) * (1 - range(p, 0.450, 0.472)) * 0.30;
+    capture.visible = p > 0.373 && p < 0.535;
     capture.position.x = paper.position.x;
     capture.position.y = paper.position.y;
     capMat.uniforms.uAlpha.value =
-      range(p, 0.430, 0.460) * (1 - range(p, 0.548, 0.590));
+      range(p, 0.382, 0.409) * (1 - range(p, 0.488, 0.526));
 
-    /* One pair of folders carries the last three beats. They draw once and
-       stay lit; the spending rises between them; the rule runs under both. The
-       old version faded the folders out and brought a different set back twice,
-       which is what made this stretch read as three unrelated scenes. */
-    const fPair = range(p, 0.618, 0.664) * (1 - range(p, 0.880, 0.914));
-    // Brought forward now the chart no longer occupies the beat before it.
-    const fLink = range(p, 0.780, 0.836) * (1 - range(p, 0.880, 0.914));
-    folderMat.uniforms.uPhaseA.value.set(fPair, fLink, 0, 0);
-    folderMat.uniforms.uDraw.value = ease(range(p, 0.616, 0.688));
-    // Track your spending: the table inside the Expenses folder turns into a
-    // chart. It is the beat's whole animation, and it keeps the middle clear.
-    folderMat.uniforms.uSpend.value = ease(range(p, 0.742, 0.806));
-    // The photographs stack a little ahead of the chart, so the two sides
-    // stagger rather than moving as one block.
-    folderMat.uniforms.uStack.value = ease(range(p, 0.700, 0.784));
-    folders.visible = Math.max(fPair, fLink) > 0.005;
+    /* The back half is one continuous object rather than three scenes: the
+       sheet arrives, writes its rows, totals itself, and is handed over. The
+       reader's scroll is the thing writing it, which is why the row count and
+       the tally are values here rather than a canned loop. */
+    const rows = ease(range(p, 0.572, 0.612))                 // the one just taken
+               + 4 * ease(range(p, 0.626, 0.716));            // the rest of the month
+    const totals = ease(range(p, 0.722, 0.752));
+    const bars = ease(range(p, 0.774, 0.838));
+    // How much of the card is drawn: the table, then the month's figures under
+    // it, then the chart those figures make.
+    const gR = sheetArt.growRows, gB = sheetArt.growBand;
+    const grow = gR + (gB - gR) * totals + (1 - gB) * bars;
+    sheetArt.set({
+      rows, totals, bars, grow,
+      tally:  ease(range(p, 0.730, 0.800)),
+      shared: ease(range(p, 0.826, 0.866)),
+    });
 
-    sheet.visible = settle > 0.001 && p < 0.72;
-    sheetMat.opacity = range(p, 0.578, 0.606) * (1 - range(p, 0.640, 0.690));
+    sheet.visible = settle > 0.001 && clear > 0.001;
+    sheetMat.opacity = range(p, 0.516, 0.548) * clear;
 
-    // Reveal by showing only the left fraction of the texture at 1:1, so the
-    // sheet writes itself in rather than stretching.
-    const wipe = Math.max(0.001, ease(range(p, 0.584, 0.630)));
-    sheetTex.repeat.x = wipe;
-    // Shrinks as it travels, so it settles into the folder rather than
-    // sliding behind it at full size.
-    const ss = (0.30 + 0.70 * settle) * (1 - intoFolder * 0.36) * fit;
-    const fullW = SHEET_W * ss, w = fullW * wipe;
-    sheet.scale.set(w, SHEET_H * ss, 1);
-    const sheetX = -1.95 * fit * settle - (fullW - w) / 2, sheetY = FOLDER_Y * settle;
+    /* Reveal by showing only the left fraction of the texture at 1:1, so the
+       sheet writes itself in rather than stretching, and only the top `grow`
+       fraction, so the card ends where its drawn bottom edge is. */
+    const wipe = Math.max(0.001, ease(range(p, 0.522, 0.572)));
+    sheetArt.texture.repeat.set(wipe, grow);
+    sheetArt.texture.offset.y = 1 - grow;
+    const ss = 0.30 + 0.70 * settle;
+    const fullW = sheetW * ss, w = fullW * wipe, h = sheetH * ss * grow;
+    sheet.scale.set(w, h, 1);
     sheet.position.set(
-      sheetX + intoFolder * (-FOLDER_X - sheetX),
-      sheetY + intoFolder * (FOLDER_Y - sheetY),
+      SHEET_X * settle - (fullW - w) / 2,
+      (SHEET_TOP - h / 2) * settle - Math.sin(p * 34.0) * 0.025 * settle,
       -0.05);
 
-    camera.position.y = -0.70 + range(p, 0.600, 0.664) * 0.88
-                              - range(p, 0.6, 0.95) * 0.05;
+    // Handed over: one rule under both, run outward from the middle.
+    const linkA = range(p, 0.830, 0.874) * clear;
+    link.visible = linkA > 0.004;
+    if (link.visible) {
+      // Side by side it runs under both. Stacked there is no room under the
+      // sheet — the chapter copy is already there — so it runs between them,
+      // which is the same statement.
+      const under = Math.min(SHEET_TOP - sheetH, PAPER_TOP - paperH) - 0.34;
+      const between = SHEET_TOP + stackGap * k * 0.5;
+      linkMat.uniforms.uHalf.value.set(pairW / 2 + 0.16, 0.028);
+      linkMat.uniforms.uAlpha.value = linkA;
+      linkMat.uniforms.uExt.value = ease(range(p, 0.832, 0.880));
+      link.position.set(0, under * wide + between * (1 - wide), 0.06);
+    }
+
+    // The frame rises a little as the pair takes over, then drifts back.
+    camera.position.y = -0.72 + range(p, 0.505, 0.585) * 0.10
+                              - range(p, 0.60, 0.95) * 0.02;
   }
 
   return {
@@ -732,8 +872,8 @@ export function createStory(canvas) {
       paper.geometry.dispose(); paperMat.dispose();
       crowd.geometry.dispose(); crowdMat.dispose();
       capture.geometry.dispose(); capMat.dispose();
-      folders.geometry.dispose(); folderMat.dispose();
-      sheet.geometry.dispose(); sheetTex.dispose(); sheetMat.dispose();
+      link.geometry.dispose(); linkMat.dispose();
+      sheet.geometry.dispose(); sheetArt.dispose(); sheetMat.dispose();
       renderer.dispose();
     },
   };
