@@ -185,7 +185,7 @@ body {
    gap of a different order to the one between the headline and the tagline.
    Bounded in vh because the hero is 100svh: on a short viewport this has to
    give way rather than push the button into the scroll hint at 21vh. */
-.ch__text--hero .btn { margin-top: clamp(18px, 6vh, 68px); }
+.ch__text--hero .btn { margin-top: clamp(8px, 1.9vh, 30px); }
 .hero__tag {
   margin-inline: 0; margin-bottom: 0; font-weight: 500; color: var(--ink-soft);
   font-size: clamp(1.0625rem, 1.8vw, 1.5rem); line-height: 1.35;
