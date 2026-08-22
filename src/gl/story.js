@@ -49,7 +49,8 @@ const PAPER_VERT = /* glsl */ `
 `;
 
 const PAPER_FRAG = /* glsl */ `
-  uniform float uScan, uFade, uShutter, uWipe, uCyanHold, uInvert, uExtract;
+  uniform float uScan, uFade, uShutter, uWipe, uCyanHold, uInvert;
+  uniform float uPickY, uPickH, uPickA;
   uniform vec3 uInk, uCyan;
   varying vec2 vUv; varying float vShade;
 
@@ -104,10 +105,14 @@ const PAPER_FRAG = /* glsl */ `
                * step(0.20, vUv.x) * step(vUv.x, 0.80);
     col = mix(col, inkc, bars * 0.72);
 
-    // What we actually read off it, once the capture has landed.
-    // The two fields Bixt took off it, highlighted where they sit.
-    float ex = rule(vUv, 0.246, 0.10, 0.99, 0.026) + rule(vUv, 0.940, 0.20, 0.80, 0.030);
-    col = mix(col, cyanc, clamp(ex, 0.0, 1.0) * uExtract * 0.55);
+    /* The field being read right now, boxed where it sits. One at a time:
+       the reader is meant to follow a single value off the paper. */
+    float dy = abs(vUv.y - uPickY);
+    float inx = step(0.07, vUv.x) * step(vUv.x, 0.93);
+    float band = smoothstep(uPickH, uPickH * 0.55, dy) * inx;
+    float pickEdge = smoothstep(0.006, 0.0, abs(dy - uPickH)) * inx;
+    col = mix(col, cyanc, band * uPickA * 0.40);
+    col += uCyan * pickEdge * uPickA * 0.85;
 
     if (uScan >= 0.0) {
       float d = abs(vUv.y - (1.0 - uScan));
@@ -255,14 +260,14 @@ function buildCrowd() {
   return g;
 }
 
-/* ---------- the hand-off rule ---------- */
+/* ---------- the carrier ---------- */
 
-/* The one mark left over from the folders that used to stand here: a solid
-   cyan rule that runs under both halves when the accountant is given them.
-   It is a rule rather than a shape because the site's line language is the
-   solid rule under the wordmark. */
+/* What travels. One field's worth of value, lifted off the paper and taken to
+   its column: a bright head with a tail behind it, so the direction of travel
+   is legible at a glance. It replaces the rule that was the last thing left
+   over from the folders. */
 
-const RULE_VERT = /* glsl */ `
+const CARRY_VERT = /* glsl */ `
   varying vec2 vP;
   void main() {
     vP = position.xy;
@@ -270,24 +275,17 @@ const RULE_VERT = /* glsl */ `
   }
 `;
 
-const RULE_FRAG = /* glsl */ `
+const CARRY_FRAG = /* glsl */ `
   uniform vec3 uCyan;
-  uniform vec2 uHalf;
-  uniform float uAlpha, uExt;
+  uniform float uAlpha;
   varying vec2 vP;
-  float rrect(vec2 p, vec2 b, float r) {
-    vec2 q = abs(p) - b + r;
-    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-  }
   void main() {
-    // Runs itself outward from the middle, so the rule is drawn rather than
-    // faded on.
-    float d = rrect(vP, vec2(uHalf.x * uExt, uHalf.y), uHalf.y);
-    float core = smoothstep(0.010, 0.0, d);
-    float glow = smoothstep(0.090, 0.0, d);
-    float a = clamp(core + glow * 0.34, 0.0, 1.0) * uAlpha;
+    // The head sits at the leading end; the tail falls away behind it.
+    float head = smoothstep(0.5, 0.0, length(vec2(vP.x * 2.6, vP.y)));
+    float tail = smoothstep(0.5, 0.0, abs(vP.y)) * smoothstep(0.5, -0.1, vP.x);
+    float a = clamp(head + tail * 0.5, 0.0, 1.0) * uAlpha;
     if (a < 0.004) discard;
-    gl_FragColor = vec4(uCyan * (1.30 + core * 1.10), a);
+    gl_FragColor = vec4(uCyan * (1.35 + head * 1.2), a);
   }
 `;
 
@@ -406,9 +404,14 @@ function createSheet() {
 
     const nCols = M.cols.length;
     SHEET_ORDER.forEach((r, k) => {
-      const t = clamp01(s.rows - k);
+      const live = r === LIVE_ROW;
+      /* The hero row is written field by field, on its own value, because the
+         reader is watching each one come off the paper. Every other row is
+         written by the row counter, quickly, because the point is already
+         made. */
+      const t = live ? clamp01(s.live) : clamp01(s.rows - (k - 1));
       if (t <= 0.001) return;
-      const y = M.top + r * M.rowH, live = r === LIVE_ROW;
+      const y = M.top + r * M.rowH;
 
       // Each row lands lit and settles; the one we photographed keeps a wash.
       const flash = Math.max(live ? 0.15 : 0, clamp01(t * 6) * (1 - t) * 0.5);
@@ -428,7 +431,10 @@ function createSheet() {
       const slice = 1 / (nCols + 2);
       let caret = L, caretA = 0;
       for (let c = 0; c < nCols; c++) {
-        const a = clamp01((t - c * slice) / (slice * 1.7));
+        // The hero row gives each column a whole step of the sequence; the
+        // rest share one sweep.
+        const a = live ? clamp01(t * nCols - c)
+                       : clamp01((t - c * slice) / (slice * 1.7));
         if (a <= 0.012) break;
         const [x, align] = M.cols[c];
         const raw = cells[M.keys[c]];
@@ -533,9 +539,21 @@ function createSheet() {
     if (s.bars > 0.01) drawChart(s);
   }
 
+  /** Where a hero-row cell sits on the canvas, in texture coordinates, so the
+      carrier knows what it is aiming at. Columns the narrow layout drops fall
+      back to the last one it kept. */
+  function cellAnchor(field) {
+    let c = M.keys.indexOf(field);
+    if (c < 0) c = M.cols.length - 1;
+    const [x, align] = M.cols[c];
+    const y = M.top + LIVE_ROW * M.rowH + M.rowH * 0.5;
+    return { u: (align === "right" ? x - 26 : x + 26) / M.w, v: 1 - y / M.h };
+  }
+
   /** Quantised so a frame that changes nothing visible does not repaint. */
   function set(s) {
     const key = M.w + "|" + Math.round(s.rows * 40) + "|" + Math.round(s.grow * 60)
+      + "|" + Math.round(s.live * 60)
       + "|" + Math.round(s.tally * 80) + "|" + Math.round(s.bars * 36)
       + "|" + Math.round(s.shared * 12);
     if (key === sig) return;
@@ -543,7 +561,7 @@ function createSheet() {
   }
 
   return {
-    texture: tex, layout, set,
+    texture: tex, layout, set, cellAnchor,
     get aspect() { return M.w / M.h; },
     get growRows() { return M.growRows; },
     get growBand() { return M.growBand; },
@@ -619,7 +637,8 @@ export function createStory(canvas) {
     name: "paper",
     vertexShader: PAPER_VERT, fragmentShader: PAPER_FRAG, transparent: true,
     uniforms: { uCrumple: { value: 1 }, uScan: { value: -1 }, uFade: { value: 1 },
-                uShutter: { value: 0 }, uExtract: { value: 0 },
+                uShutter: { value: 0 },
+                uPickY: { value: 0.5 }, uPickH: { value: 0.03 }, uPickA: { value: 0 },
                 uWipe: { value: 0 }, uCyanHold: { value: 0 }, uInvert: { value: 0 },
                 uInk: { value: INK }, uCyan: { value: CYAN } },
   });
@@ -653,17 +672,16 @@ export function createStory(canvas) {
   scene.add(capture);
 
   // The hand-off: one rule under both halves when the accountant is given them.
-  const linkMat = new ShaderMaterial({
-    name: "link",
-    vertexShader: RULE_VERT, fragmentShader: RULE_FRAG,
+  const carryMat = new ShaderMaterial({
+    name: "carry",
+    vertexShader: CARRY_VERT, fragmentShader: CARRY_FRAG,
     transparent: true, depthWrite: false, blending: AdditiveBlending,
-    uniforms: { uCyan: { value: CYAN }, uHalf: { value: new Vector2(3.4, 0.028) },
-                uAlpha: { value: 0 }, uExt: { value: 0 } },
+    uniforms: { uCyan: { value: CYAN }, uAlpha: { value: 0 } },
   });
-  const link = new Mesh(new PlaneGeometry(9, 1), linkMat);
-  link.frustumCulled = false;
-  link.visible = false;
-  scene.add(link);
+  const carry = new Mesh(new PlaneGeometry(1, 1), carryMat);
+  carry.frustumCulled = false;
+  carry.visible = false;
+  scene.add(carry);
 
   // A standard material on purpose: the custom sheet shader intermittently
   // failed to link, and when it did the spreadsheet never drew at all.
@@ -792,7 +810,6 @@ export function createStory(canvas) {
       ease(range(p, 0.463, 0.473)) * (1 - ease(range(p, 0.473, 0.493)));
     paperMat.uniforms.uInvert.value = ease(range(p, 0.463, 0.517));
     // The two fields it read stay lit until they have landed in the row.
-    paperMat.uniforms.uExtract.value = range(p, 0.495, 0.531) * (1 - range(p, 0.620, 0.664));
 
     const lock = range(p, 0.391, 0.432);
     const e = lock * lock * (3.0 - 2.0 * lock);
@@ -814,8 +831,35 @@ export function createStory(canvas) {
        sheet arrives, writes its rows, totals itself, and is handed over. The
        reader's scroll is the thing writing it, which is why the row count and
        the tally are values here rather than a canned loop. */
-    const rows = ease(range(p, 0.572, 0.612))                 // the one just taken
-               + 4 * ease(range(p, 0.626, 0.716));            // the rest of the month
+    /* The hero row: five fields, found on the paper one at a time and carried
+       into their columns. It is the only row that gets this, and it owns a
+       chapter and a half of scroll, because the whole claim of the product is
+       legible here or nowhere. */
+    const F0 = 0.548, FSTEP = 0.0286, NF = 5;
+    // Where each field sits on the paper. Total near the foot of it, tax just
+    // above, the way a till roll really prints.
+    const PICK_Y = [0.868, 0.940, 0.642, 0.246, 0.312];
+    const PICK_H = [0.026, 0.032, 0.024, 0.030, 0.022];
+
+    let live = 0, carryA = 0, carryT = 0, pickField = 0;
+    const fRaw = (p - F0) / FSTEP, fi = Math.floor(fRaw);
+    if (fi >= 0 && fi < NF) {
+      const u = fRaw - fi;                       // where we are inside this field
+      pickField = fi;
+      paperMat.uniforms.uPickY.value = PICK_Y[fi];
+      paperMat.uniforms.uPickH.value = PICK_H[fi];
+      // found, held while it travels, released once it has landed
+      paperMat.uniforms.uPickA.value =
+        ease(range(u, 0.00, 0.18)) * (1 - ease(range(u, 0.74, 0.97)));
+      carryT = ease(range(u, 0.30, 0.76));
+      carryA = range(u, 0.27, 0.36) * (1 - range(u, 0.72, 0.84));
+      live = (fi + ease(range(u, 0.60, 0.88))) / NF;
+    } else {
+      paperMat.uniforms.uPickA.value = 0;
+      live = fRaw >= NF ? 1 : 0;
+    }
+    // The rest of the month, after the demonstration is over.
+    const rows = 4 * ease(range(p, 0.706, 0.792));
     const totals = ease(range(p, 0.722, 0.752));
     const bars = ease(range(p, 0.774, 0.838));
     // How much of the card is drawn: the table, then the month's figures under
@@ -823,7 +867,7 @@ export function createStory(canvas) {
     const gR = sheetArt.growRows, gB = sheetArt.growBand;
     const grow = gR + (gB - gR) * totals + (1 - gB) * bars;
     sheetArt.set({
-      rows, totals, bars, grow,
+      rows, live, totals, bars, grow,
       tally:  ease(range(p, 0.730, 0.800)),
       shared: ease(range(p, 0.826, 0.866)),
     });
@@ -845,19 +889,30 @@ export function createStory(canvas) {
       (SHEET_TOP - h / 2) * settle - Math.sin(p * 34.0) * 0.025 * settle,
       -0.05);
 
-    // Handed over: one rule under both, run outward from the middle.
-    const linkA = range(p, 0.830, 0.874) * clear;
-    link.visible = linkA > 0.004;
-    if (link.visible) {
-      // Side by side it runs under both. Stacked there is no room under the
-      // sheet — the chapter copy is already there — so it runs between them,
-      // which is the same statement.
-      const under = Math.min(SHEET_TOP - sheetH, PAPER_TOP - paperH) - 0.34;
-      const between = SHEET_TOP + stackGap * k * 0.5;
-      linkMat.uniforms.uHalf.value.set(pairW / 2 + 0.16, 0.028);
-      linkMat.uniforms.uAlpha.value = linkA;
-      linkMat.uniforms.uExt.value = ease(range(p, 0.832, 0.880));
-      link.position.set(0, under * wide + between * (1 - wide), 0.06);
+    /* The carrier: from the lit field on the paper to the cell it belongs in.
+       Both ends are read off the objects themselves rather than guessed, so it
+       still lands on the cell when the layout switches to the narrow one. */
+    const carryOn = carryA * clear;
+    carry.visible = carryOn > 0.004;
+    if (carry.visible) {
+      const fromX = paper.position.x;
+      const fromY = paper.position.y
+        + (PICK_Y[pickField] - 0.5) * H * paper.scale.y;
+
+      const anchor = sheetArt.cellAnchor(pickField);
+      // The mesh shows texture u across its width and the top `grow` of v, so
+      // a texture coordinate maps back through the same two numbers.
+      const toX = sheet.position.x - w / 2 + anchor.u * fullW;
+      const toY = sheet.position.y - h / 2
+        + (anchor.v - (1 - grow)) * sheetH * ss;
+
+      const cx = fromX + (toX - fromX) * carryT;
+      const cy = fromY + (toY - fromY) * carryT;
+      const len = Math.hypot(toX - fromX, toY - fromY);
+      carry.position.set(cx, cy, 0.08);
+      carry.rotation.z = Math.atan2(toY - fromY, toX - fromX);
+      carry.scale.set(Math.max(0.35, len * 0.30), 0.085, 1);
+      carryMat.uniforms.uAlpha.value = carryOn;
     }
 
     // The frame rises a little as the pair takes over, then drifts back.
@@ -872,7 +927,7 @@ export function createStory(canvas) {
       paper.geometry.dispose(); paperMat.dispose();
       crowd.geometry.dispose(); crowdMat.dispose();
       capture.geometry.dispose(); capMat.dispose();
-      link.geometry.dispose(); linkMat.dispose();
+      carry.geometry.dispose(); carryMat.dispose();
       sheet.geometry.dispose(); sheetArt.dispose(); sheetMat.dispose();
       renderer.dispose();
     },
